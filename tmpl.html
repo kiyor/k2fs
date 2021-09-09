@@ -1,0 +1,141 @@
+<!DOCTYPE HTML>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>File Browser</title>
+  <meta name="description" content="k2fs">
+  <meta name="author" content="Kiyor">
+
+  <link rel="icon" href="/favicon.ico">
+
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css"
+    rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC"
+    crossorigin="anonymous">
+  <link rel="stylesheet" href="https://pro.fontawesome.com/releases/v5.10.0/css/all.css"
+    integrity="sha384-AYmEC3Yw5cVb3ZcuHtOA93w35dYTsvhLPVnYs9eStHfGJvOvKxVfELGroGkvsg+p"
+    crossorigin="anonymous" />
+
+</head>
+<style>
+  body {
+    font-family: "Microsoft Yahei", "Helvetica Neue", "Luxi Sans", "DejaVu Sans", Tahoma, "Hiragino Sans GB", STHeiti;
+  }
+
+  table {
+    font-size: 1.8em;
+  }
+
+  @media (max-width: 980px) {
+    table {
+      font-size: 1.8em;
+    }
+  }
+</style>
+
+<body>
+
+  <div id="app">
+    <div class="container">
+      <div class="row">
+        <div class="col-1">
+          <a v-on:click="clickUpDir(path)">
+            <h1> &lt; </h1>
+          </a>
+        </div>
+        <div class="col-5">
+          <h1>{{dir}}</h1>
+        </div>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="row">
+        <div class="col-11">
+          <table class="table table-hover">
+            <tr>
+              <th><a v-on:click="sortByApi('name')">Name</a></th>
+              <th><a v-on:click="sortByApi('size')">Size</a></th>
+              <th>Tags</th>
+              <th>Func</th>
+              <th><a v-on:click="sortByApi('modtime')">LastMod</a></th>
+            </tr>
+
+            <tr v-for="file in files" v-bind:class="'table-' + file.Meta.Label">
+              <td v-bind:name="file.Hash" v-bind:id="file.Hash">
+                <i v-if="file.Meta.Star" class="fas fa-star"></i>
+                <span v-if="file.IsDir">
+                  <i class="far fa-folder-open"></i>
+                  <a v-on:click="clickDir(path,file.Name,file.Hash)" v-bind:class="checkTextClass(file)"> {{file.Name}}</a>
+                </span>
+                <span v-if="!file.IsDir">
+                  <i class="far fa-file"></i>
+                  <a v-bind:href="'/statics' + path + '/' + file.Name" target="_blank"> {{file.Name}}</a>
+                </span>
+              </td>
+              <td>{{file.SizeH}}</td>
+              <td></td>
+              <td>
+                <div class="input-group">
+                  <input type="checkbox" @click="onSelect(file)" v-model="select[file.Name]">
+                  <input name="input" type="text" class="form-control" v-if="select[file.Name]">
+                  <div class="dropdown" v-if="select[file.Name]">
+                    <a class="btn btn-light dropdown-toggle" type="button"
+                      v-bind:id="file.Hash" data-bs-toggle="dropdown"
+                      aria-expanded="false">
+                      ... 
+                    </a >
+                    <ul class="dropdown-menu" v-bind:aria-labelledby="file.Hash">
+                      <li><a class="dropdown-item text-danger" v-on:click="operation('delete')">Delete</a>
+                      <li><a class="dropdown-item" v-on:click="operation('star')"><i class="fas fa-star"></i></a>
+                      <li><a class="dropdown-item alert alert-light" v-on:click="operation('label')">label 0</a></li>
+                      <li><a class="dropdown-item alert alert-success" v-on:click="operation('label=success')">label 1</a></li>
+                      <li><a class="dropdown-item alert alert-info" v-on:click="operation('label=info')">label 2</a></li>
+                      <li><a class="dropdown-item alert alert-warning" v-on:click="operation('label=warning')">label 3</a></li>
+                      <li><a class="dropdown-item alert alert-danger" v-on:click="operation('label=danger')">label 4</a></li>
+                    </ul>
+                  </div>
+                </div>
+              </td>
+              <td>{{file.ModTimeH}}</td>
+            </tr>
+          </table>
+        </div>
+        <div class="col-1">
+        </div>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="row">
+        <div class="col-1">
+          <a v-on:click="clickUpDir(path)">
+            <h1> &lt; </h1>
+          </a>
+        </div>
+        <div class="col-11">
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+
+  <!--   <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" -->
+  <!--     crossorigin="anonymous"></script> -->
+  <script src="https://unpkg.com/vue@next"></script>
+  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.1/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-/bQdsTh/da6pkI1MST/rWKFNjaCP5gBSY4sEBT38Q/9RBh9AH40zEOg7Hlq2THRZ"
+    crossorigin="anonymous"></script>
+  <script>
+    var _host = '[[.]]';
+  </script>
+  <script src="/app.js"></script>
+</body>
+
+</html>

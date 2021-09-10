@@ -77,6 +77,7 @@ func apiOperation(w http.ResponseWriter, r *http.Request) {
 					trashMeta.Set(k, m)
 					trashMeta.Write()
 				}
+				cache.Remove("size:" + Trash)
 			}
 		}
 	}

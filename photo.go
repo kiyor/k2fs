@@ -53,16 +53,19 @@ func renderPhoto(w http.ResponseWriter, r *http.Request) {
 	var images Images
 
 	images.Title = filepath.Base(dir)
-	fs := readDir(dir)
+	fs := readDir2(dir)
 	if len(fs) == 0 {
-		http.Redirect(w, r, r.URL.String(), 302)
+		http.Redirect(w, r, "/"+path, 302)
 		return
 	}
-	sort.Slice(fs, func(i, j int) bool {
-		return fs[i].Name() < fs[j].Name()
-	})
+	// 	sort.Slice(fs, func(i, j int) bool {
+	// 		return fs[i].Name() < fs[j].Name()
+	// 	})
+	sort.Strings(fs)
 	for _, f := range fs {
-		fp := filepath.Join("/statics", path, f.Name())
+		// 		fp := filepath.Join("/statics", path, f.Name())
+		fp := filepath.Join("/statics", f)
+		log.Println(fp)
 		images.Images = append(images.Images, Image(fp))
 	}
 	f := template.FuncMap{
@@ -90,6 +93,27 @@ func readDir(path string) (fs []os.FileInfo) {
 				break
 			}
 		}
+	}
+	return
+}
+
+func readDir2(path string) (fs []string) {
+	err := filepath.Walk(path, func(p string, _ os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		for _, ext := range photoExt {
+			if strings.ToLower(filepath.Ext(p)) == ext {
+				f := p[len(rootDir):]
+				log.Println(f)
+				fs = append(fs, f)
+				break
+			}
+		}
+		return err
+	})
+	if err != nil {
+		log.Println(err)
 	}
 	return
 }

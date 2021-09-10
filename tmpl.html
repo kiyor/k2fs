@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <title>File Browser</title>
   <meta name="description" content="k2fs">
@@ -40,7 +40,7 @@
 <body>
 
   <div id="app">
-    <div class="container">
+    <div v-bind:class="class_container">
       <div class="row">
         <div class="col-1">
           <a v-on:click="clickUpDir(path)">
@@ -56,14 +56,13 @@
       </div>
     </div>
 
-    <div class="container">
+    <div v-bind:class="class_container">
       <div class="row">
         <div class="col-11">
           <table class="table table-hover">
             <tr>
               <th><a v-on:click="sortByApi('name')">Name</a></th>
               <th><a v-on:click="sortByApi('size')">Size</a></th>
-              <th>Tags</th>
               <th>Func</th>
               <th><a v-on:click="sortByApi('modtime')">LastMod</a></th>
             </tr>
@@ -81,11 +80,9 @@
                 </span>
               </td>
               <td>{{file.SizeH}}</td>
-              <td></td>
               <td>
                 <div class="input-group">
                   <input type="checkbox" @click="onSelect(file)" v-model="select[file.Name]">
-                  <input name="input" type="text" class="form-control" v-if="select[file.Name]">
                   <div class="dropdown" v-if="select[file.Name]">
                     <a class="btn btn-light dropdown-toggle" type="button"
                       v-bind:id="file.Hash" data-bs-toggle="dropdown"
@@ -113,7 +110,7 @@
       </div>
     </div>
 
-    <div class="container">
+    <div v-bind:class="class_container">
       <div class="row">
         <div class="col-1">
           <a v-on:click="clickUpDir(path)">

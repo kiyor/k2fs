@@ -7,10 +7,31 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/dustin/go-humanize"
 	kfs "github.com/kiyor/kfs/lib"
 )
+
+var hideExt = []string{
+	".MHT",
+	".CHM",
+	".LNK",
+	".APK",
+	".PNG",
+	".TXT",
+	".TODO",
+	kfs.KFS,
+}
+
+func needHide(path string) bool {
+	for _, v := range hideExt {
+		if strings.ToUpper(filepath.Ext(path)) == v {
+			return true
+		}
+	}
+	return false
+}
 
 func apiList(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
@@ -31,7 +52,7 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 		dir := NewDir()
 		meta := kfs.NewMeta(path)
 		for _, f := range fs {
-			if f.Name() == kfs.KFS {
+			if needHide(f.Name()) {
 				continue
 			}
 			nf := NewFile(f.Name())

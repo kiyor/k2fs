@@ -81,6 +81,7 @@ func main() {
 	fileServer := http.FileServer(http.Dir(rootDir))
 	r.PathPrefix("/api").HandlerFunc(api)
 	r.PathPrefix("/statics").Handler(http.StripPrefix("/statics", fileServer))
+	r.PathPrefix("/photo").HandlerFunc(renderPhoto)
 	r.PathPrefix("/").HandlerFunc(universal)
 	handler := NewLogHandler().Handler(r)
 	http.Handle("/", handler)

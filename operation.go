@@ -23,14 +23,12 @@ var Trash string
 
 func apiOperation(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
-	body, err := ioutil.ReadAll(r.Body)
+	var op Operation
+	err := json.NewDecoder(r.Body).Decode(&op)
 	if err != nil {
-		w.Write(NewErrResp(1, err))
+		NewErrResp(w, 1, err)
 		return
 	}
-	var op Operation
-	json.Unmarshal(body, &op)
-	// 	log.Println(toJSON(op))
 
 	path := filepath.Join(rootDir, op.Dir)
 
@@ -43,7 +41,7 @@ func apiOperation(w http.ResponseWriter, r *http.Request) {
 			switch {
 			case strings.HasPrefix(op.Action, "label"):
 				to := strings.Split(op.Action, "=")
-				if len(to) > 0 {
+				if len(to) > 1 {
 					m.Label = to[1]
 				} else {
 					m.Label = ""
@@ -82,5 +80,6 @@ func apiOperation(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	meta.Write()
+	NewResp(w, "success")
 	// 	log.Println(toJSON(meta))
 }

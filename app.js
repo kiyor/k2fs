@@ -18,6 +18,26 @@ var _upDir = function(path) {
   return p.join('/')
 }
 
+var _hide = function() {
+  var myOffcanvas = document.getElementById('offcanvas');
+  var bsOffcanvas = new bootstrap.Offcanvas(myOffcanvas);
+  bsOffcanvas.toggle();
+  bsOffcanvas.toggle();
+  bsOffcanvas.toggle();
+  bsOffcanvas.toggle();
+}
+
+var _show = function() {
+  var myOffcanvas = document.getElementById('offcanvas');
+  var bsOffcanvas = new bootstrap.Offcanvas(myOffcanvas);
+  bsOffcanvas.hide();
+}
+
+var _jump = function(h) {
+  var top = document.getElementById(h).offsetTop; //Getting Y of target element
+  window.scrollTo(0, top); //Go there directly or some transition
+}
+
 String.prototype.trimRight = function(charlist) {
   if (charlist === undefined)
     charlist = "\s";
@@ -30,27 +50,25 @@ const myapp = {
     return {
       class_container: "container-lg",
       path: _pathname,
-      dir: _getDir(_pathname).trimRight("/"),
+      dir: "",
+      updir: "",
       hash: [],
-      response: {},
+      resp: {},
       select: {},
       files: [],
+      subListOpen: {}, // open sub folder, path: bool
+      subList: {}, // open sub folder, path: files
       desc: "1",
     }
   },
   mounted() {
-    if (this.path === "/") {
-      this.dir = this.path;
-    }
-    console.log(this.path);
-    console.log(this.dir);
+    //     console.log(this.path); 
+    //     console.log(this.dir); 
     this.listApi(this.path);
   },
   methods: {
     clickDir(path, file, hash) {
-      file = file.trimRight("/");
-      path = path.trimRight("/");
-      this.path = path + "/" + file
+      this.path = this.getSub(path, file);
       this.listApi(this.path);
       var nextURL = _host + this.path;
       var nextTitle = '';
@@ -58,25 +76,65 @@ const myapp = {
         additionalInformation: ''
       };
       window.history.pushState(nextState, nextTitle, nextURL);
-      this.dir = _getDir(this.path);
       console.log(hash);
       this.hash.push(hash);
       console.log(this.hash);
     },
+    isOpened(path, file) {
+      if (!file.IsDir) {
+        return false;
+      }
+      if (this.subListOpen[this.getSub(path, file.Name)] === undefined) {
+        this.subListOpen[this.getSub(path, file.Name)] = false;
+      }
+      return this.subListOpen[this.getSub(path, file.Name)];
+    },
+    trimRight(a, b) {
+      return a.trimRight(b);
+    },
+    getSubLink(path, file, sub) { // string path, object file and object sub
+      if (sub.IsDir) {
+        return path.trimRight('/') + '/' + file.Name + sub.Name;
+      } else {
+        return '/statics' + path.trimRight('/') + '/' + file.Name + sub.Name;
+      }
+    },
+    getSub(path, file) {
+      file = file.trimRight("/");
+      path = path.trimRight("/");
+      return path + "/" + file;
+    },
+    clickSubDir(path, file) {
+      var sub = this.getSub(path, file);
+      console.log(sub);
+      if (this.subListOpen[sub] === undefined) {
+        this.subListOpen[sub] = true;
+      } else {
+        this.subListOpen[sub] = !this.subListOpen[sub]
+      }
+      if (this.subListOpen[sub]) {
+        this.listSubApi(sub);
+      }
+    },
     clickUpDir(path) {
-      this.path = _upDir(path);
+      this.path = this.resp.UpDir;
+      var hash = this.resp.Hash
       this.listApi(this.path);
+      console.log(hash);
       var nextURL = _host + this.path;
       var nextTitle = '';
       var nextState = {
         additionalInformation: ''
       };
       window.history.pushState(nextState, nextTitle, nextURL);
-      this.dir = _getDir(this.path);
+      //       window.location.hash = hash; 
+      //       window.location.reload(); 
       console.log(this.hash);
+      //       _jump(hash); 
     },
     onSelect(file) {
       console.log(this.select);
+      _show();
     },
     checkTextClass(file) {
       if (this.hash[this.hash.length - 1] === file.Hash) {
@@ -97,17 +155,36 @@ const myapp = {
           console.log(response.data);
           this.select = {};
           this.listApi(this.path);
+          _hide();
         })
         .catch(error => {
           console.log(error)
         })
     },
     listApi(path) {
-      axios.get("/api?action=list&path=" + path)
+      var data = {};
+      data.path = path;
+      axios.post("/api?action=list", data)
         .then(response => {
-          this.response = response.data;
-          this.files = response.data.Data.Files;
-          console.log(response.data);
+          this.resp = response.data.Data;
+          this.updir = this.resp.UpDir;
+          this.dir = this.resp.Dir;
+          this.files = this.resp.Files;
+          console.log(this.resp);
+        })
+        .catch(error => {
+          console.log(error)
+        })
+    },
+    listSubApi(path) {
+      var data = {};
+      data.path = path;
+      axios.post("/api?action=list", data)
+        .then(response => {
+          var resp = response.data.Data;
+          this.subList[path] = resp.Files;
+          console.log(this.resp);
+          console.log(this.subList);
         })
         .catch(error => {
           console.log(error)
@@ -132,4 +209,45 @@ const myapp = {
 }
 
 const app = Vue.createApp(myapp);
+
+app.component('selected', {
+  props: ['k', 'v'], // define argument
+  template: `<li v-if="v">{{k}}</li>`
+})
+
+app.component('render-file', {
+  props: ['file', 'path', 'select', 'hash'], // define argument
+  methods: {
+    checkTextClass(file) {
+      if (this.hash[this.hash.length - 1] === file.Hash) {
+        return "text-warning"
+      }
+      if (this.hash.includes(file.Hash)) {
+        return "text-danger"
+      }
+      return ""
+    },
+  },
+  template: `
+<tr v-bind:class="'table-' + file.Meta.Label">
+  <td v-bind:name="file.Hash" v-bind:id="file.Hash">
+    <i v-if="file.Meta.Star" class="fas fa-star"></i>
+    <span v-if="file.IsDir">
+      <i class="far fa-folder-open"></i>
+      <a v-on:click="clickDir(path,file.Name,file.Hash)" v-bind:class="checkTextClass(file)"> {{file.Name}}</a>
+    </span>
+    <span v-if="!file.IsDir">
+      <i class="far fa-file"></i>
+      <a v-bind:href="'/statics' + path + '/' + file.Name" target="_blank"> {{file.Name}}</a>
+    </span>
+  </td>
+  <td>{{file.SizeH}}</td>
+  <td>
+    <input type="checkbox" v-model="select[file.Name]" data-bs-toggle="offcanvas" data-bs-target="#offcanvas" aria-controls="offcanvas">
+  </td>
+  <td>{{file.ModTimeH}}</td>
+</tr>
+`
+})
+
 app.mount('#app');

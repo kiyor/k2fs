@@ -18,7 +18,7 @@ type Resp struct {
 	Data interface{}
 }
 
-func NewResp(data interface{}, code ...int) []byte {
+func NewResp(w http.ResponseWriter, data interface{}, code ...int) []byte {
 	c := 0
 	if len(code) > 0 {
 		c = code[0]
@@ -31,14 +31,19 @@ func NewResp(data interface{}, code ...int) []byte {
 	if err != nil {
 		log.Println(err)
 	}
+	w.Header().Add("content-type", "application/json")
+	w.Write(b)
 	return b
 }
 
-func NewErrResp(code int, err error) []byte {
-	return NewResp(err.Error(), code)
+func NewErrResp(w http.ResponseWriter, code int, err error) []byte {
+	return NewResp(w, err.Error(), code)
 }
 
 type Dir struct {
+	Dir   string
+	UpDir string
+	Hash  string
 	Files Files
 }
 

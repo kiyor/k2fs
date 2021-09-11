@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -33,23 +34,46 @@ func needHide(path string) bool {
 	return false
 }
 
+func upDir(path string) string {
+	if path == "/" {
+		return path
+	}
+	return path[:len(path)-len(filepath.Base(path))]
+}
+
 func apiList(w http.ResponseWriter, r *http.Request) {
-	q := r.URL.Query()
+	defer r.Body.Close()
+	m := make(map[string]string)
+	err := json.NewDecoder(r.Body).Decode(&m)
+	if err != nil {
+		log.Println(err)
+		NewErrResp(w, 1, err)
+		return
+	}
 	// 	path := "." + q.Get("path")
-	path := filepath.Join(rootDir, q.Get("path"))
+	m["path"] = strings.TrimRight(m["path"], "/")
+	if len(m["path"]) == 0 {
+		m["path"] = "/"
+	}
+	path := filepath.Join(rootDir, m["path"])
 	f, err := os.Stat(path)
 	if err != nil {
-		w.Write(NewErrResp(1, err))
+		log.Println(err)
+		NewErrResp(w, 1, err)
 		return
 	}
 	session, _ := store.Get(r, APP)
 	if f.IsDir() {
 		fs, err := ioutil.ReadDir(path)
 		if err != nil {
-			w.Write(NewErrResp(1, err))
+			NewErrResp(w, 1, err)
 			return
 		}
 		dir := NewDir()
+		dir.Dir = m["path"]
+		dir.Hash = hash(path)
+		dir.UpDir = upDir(dir.Dir)
+
 		meta := kfs.NewMeta(path)
 		for _, f := range fs {
 			if needHide(f.Name()) {
@@ -123,6 +147,6 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 				return b
 			})
 		}
-		w.Write(NewResp(dir))
+		NewResp(w, dir)
 	}
 }

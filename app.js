@@ -58,6 +58,8 @@ const myapp = {
       files: [],
       subListOpen: {}, // open sub folder, path: bool
       subList: {}, // open sub folder, path: files
+      labelMap: {}, // backup label color
+      lastLabel: "", // the last click folder
       desc: "1",
     }
   },
@@ -109,14 +111,22 @@ const myapp = {
         return
       }
       var sub = this.getSub(path, file.Name);
-      console.log(sub);
       if (this.subListOpen[sub] === undefined) {
         this.subListOpen[sub] = true;
       } else {
         this.subListOpen[sub] = !this.subListOpen[sub]
       }
+      console.log(this.subListOpen[sub] + " " + this.lastLabel);
       if (this.subListOpen[sub]) {
         this.listSubApi(sub);
+        file.Meta.Label = "dark";
+        this.lastLabel = file.Name;
+      } else {
+        for (let i = 0; i < this.files.length; i++) {
+          if (this.lastLabel === this.files[i].Name) {} else {
+            this.files[i].Meta.Label = this.labelMap[this.files[i].Name];
+          }
+        }
       }
     },
     clickUpDir(path) {
@@ -130,10 +140,7 @@ const myapp = {
         additionalInformation: ''
       };
       window.history.pushState(nextState, nextTitle, nextURL);
-      //       window.location.hash = hash; 
-      //       window.location.reload(); 
       console.log(this.hash);
-      //       _jump(hash); 
     },
     onSelect(file) {
       console.log(this.select);
@@ -173,7 +180,11 @@ const myapp = {
           this.updir = this.resp.UpDir;
           this.dir = this.resp.Dir;
           this.files = this.resp.Files;
+          for (let i = 0; i < this.files.length; i++) {
+            this.labelMap[this.files[i].Name] = this.files[i].Meta.Label;
+          }
           console.log(this.resp);
+          console.log(this.labelMap);
         })
         .catch(error => {
           console.log(error)

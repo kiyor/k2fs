@@ -67,8 +67,8 @@ const myapp = {
     this.listApi(this.path);
   },
   methods: {
-    clickDir(path, file, hash) {
-      this.path = this.getSub(path, file);
+    clickDir(path, file) {
+      this.path = this.getSub(path, file.Name);
       this.listApi(this.path);
       var nextURL = _host + this.path;
       var nextTitle = '';
@@ -105,7 +105,10 @@ const myapp = {
       return path + "/" + file;
     },
     clickSubDir(path, file) {
-      var sub = this.getSub(path, file);
+      if (!file.IsDir) {
+        return
+      }
+      var sub = this.getSub(path, file.Name);
       console.log(sub);
       if (this.subListOpen[sub] === undefined) {
         this.subListOpen[sub] = true;

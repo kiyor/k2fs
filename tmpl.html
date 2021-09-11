@@ -70,10 +70,10 @@
             <tbody>
 
               <tr v-for="file in files" v-bind:class="'table-' + file.Meta.Label">
-                <td v-bind:name="file.Hash" v-bind:id="file.Hash">
+                <td v-bind:name="file.Hash" v-bind:id="file.Hash" @click="clickSubDir(path,file)">
                   <i v-if="file.Meta.Star" class="fas fa-star"></i>
-                  <a v-if="file.IsDir" @click="clickSubDir(path,file.Name)"><i class="far fa-folder-open"></i></a>
-                  <a v-if="file.IsDir" @click="clickDir(path,file.Name,file.Hash)" v-bind:class="checkTextClass(file)"> {{file.Name}}</a>
+                  <a v-if="file.IsDir"><i class="far fa-folder-open"></i></a>
+                  <a v-if="file.IsDir" @click="clickDir(path,file)" v-bind:class="checkTextClass(file)"> {{file.Name}}</a>
                   <i v-if="!file.IsDir" class="far fa-file"></i>
                   <a v-if="!file.IsDir" v-bind:href="'/statics' + path + '/' + file.Name" target="_blank"> {{file.Name}}</a>
                   <ul v-if="isOpened(path,file)">

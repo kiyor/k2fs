@@ -70,6 +70,9 @@ const myapp = {
   },
   methods: {
     clickDir(path, file) {
+      if (!file.IsDir) {
+        return
+      }
       this.path = this.getSub(path, file.Name);
       this.listApi(this.path);
       var nextURL = _host + this.path;
@@ -78,8 +81,8 @@ const myapp = {
         additionalInformation: ''
       };
       window.history.pushState(nextState, nextTitle, nextURL);
-      console.log(hash);
-      this.hash.push(hash);
+      console.log(this.resp.Hash);
+      this.hash.push(this.resp.Hash);
       console.log(this.hash);
     },
     isOpened(path, file) {
@@ -101,6 +104,9 @@ const myapp = {
         return '/statics' + path.trimRight('/') + '/' + file.Name + sub.Name;
       }
     },
+    getLink(path, file) {
+      return '/statics' + path + '/' + file.Name;
+    },
     getSub(path, file) {
       file = file.trimRight("/");
       path = path.trimRight("/");
@@ -116,16 +122,21 @@ const myapp = {
       } else {
         this.subListOpen[sub] = !this.subListOpen[sub]
       }
-      console.log(this.subListOpen[sub] + " " + this.lastLabel);
+      // if make it open, clean up other open folder
       if (this.subListOpen[sub]) {
         this.listSubApi(sub);
         file.Meta.Label = "dark";
         this.lastLabel = file.Name;
-      } else {
-        for (let i = 0; i < this.files.length; i++) {
-          if (this.lastLabel === this.files[i].Name) {} else {
-            this.files[i].Meta.Label = this.labelMap[this.files[i].Name];
+        for (let k in this.subListOpen) {
+          if (k !== sub) {
+            this.subListOpen[k] = false;
           }
+        }
+      }
+      // roll back other folder label color exect last folder
+      for (let i = 0; i < this.files.length; i++) {
+        if (this.lastLabel === this.files[i].Name) {} else {
+          this.files[i].Meta.Label = this.labelMap[this.files[i].Name];
         }
       }
     },
@@ -155,6 +166,12 @@ const myapp = {
       }
       return ""
     },
+    checkTableClass(file) {
+      if (file.Meta.Label.length > 0) {
+        return "table-" + file.Meta.Label
+      }
+      return ""
+    },
     operation(action) {
       var data = {};
       data.files = this.select;
@@ -174,6 +191,7 @@ const myapp = {
     listApi(path) {
       var data = {};
       data.path = path;
+      data.list = "read";
       axios.post("/api?action=list", data)
         .then(response => {
           this.resp = response.data.Data;
@@ -193,6 +211,7 @@ const myapp = {
     listSubApi(path) {
       var data = {};
       data.path = path;
+      data.listdir = "find";
       axios.post("/api?action=list", data)
         .then(response => {
           var resp = response.data.Data;
@@ -227,41 +246,6 @@ const app = Vue.createApp(myapp);
 app.component('selected', {
   props: ['k', 'v'], // define argument
   template: `<li v-if="v">{{k}}</li>`
-})
-
-app.component('render-file', {
-  props: ['file', 'path', 'select', 'hash'], // define argument
-  methods: {
-    checkTextClass(file) {
-      if (this.hash[this.hash.length - 1] === file.Hash) {
-        return "text-warning"
-      }
-      if (this.hash.includes(file.Hash)) {
-        return "text-danger"
-      }
-      return ""
-    },
-  },
-  template: `
-<tr v-bind:class="'table-' + file.Meta.Label">
-  <td v-bind:name="file.Hash" v-bind:id="file.Hash">
-    <i v-if="file.Meta.Star" class="fas fa-star"></i>
-    <span v-if="file.IsDir">
-      <i class="far fa-folder-open"></i>
-      <a v-on:click="clickDir(path,file.Name,file.Hash)" v-bind:class="checkTextClass(file)"> {{file.Name}}</a>
-    </span>
-    <span v-if="!file.IsDir">
-      <i class="far fa-file"></i>
-      <a v-bind:href="'/statics' + path + '/' + file.Name" target="_blank"> {{file.Name}}</a>
-    </span>
-  </td>
-  <td>{{file.SizeH}}</td>
-  <td>
-    <input type="checkbox" v-model="select[file.Name]" data-bs-toggle="offcanvas" data-bs-target="#offcanvas" aria-controls="offcanvas">
-  </td>
-  <td>{{file.ModTimeH}}</td>
-</tr>
-`
 })
 
 app.mount('#app');

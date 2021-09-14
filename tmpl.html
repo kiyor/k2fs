@@ -25,12 +25,12 @@
   }
 
   table {
-    font-size: 1.8em;
+    font-size: 2.0em;
   }
 
   @media (max-width: 980px) {
     table {
-      font-size: 1.2em;
+      font-size: 1.0em;
     }
   }
 </style>
@@ -69,31 +69,23 @@
 
             <tbody>
 
-              <tr v-for="file in files" v-bind:class="'table-' + file.Meta.Label">
-                <td v-bind:name="file.Hash" v-bind:id="file.Hash" @click="clickSubDir(path,file)">
+              <tr v-for="file in files" v-bind:class="checkTableClass(file)">
+                <td v-bind:name="file.Hash" v-bind:id="file.Hash">
                   <i v-if="file.Meta.Star" class="fas fa-star"></i>
-                  <a v-if="file.IsDir"><i class="far fa-folder-open"></i></a>
-                  <a v-if="file.IsDir" @click="clickDir(path,file)" v-bind:class="checkTextClass(file)"> {{file.Name}}</a>
+                  <span v-if="file.IsDir" @click="clickSubDir(path,file)"><i class="far fa-folder-open"></i></span>
+                  <span v-if="file.IsDir" @click="clickDir(path,file)" v-bind:class="checkTextClass(file)"> {{file.Name}}</span>
                   <i v-if="!file.IsDir" class="far fa-file"></i>
-                  <a v-if="!file.IsDir" v-bind:href="'/statics' + path + '/' + file.Name" target="_blank"> {{file.Name}}</a>
+                  <a v-if="!file.IsDir" :href="getLink(path,file)" target="_blank"> {{file.Name}}</a>
                   <ul v-if="isOpened(path,file)">
                     <li v-for="sub in subList[getSub(path,file.Name)]"><a :href="getSubLink(path,file,sub)" target="_blank">{{sub.Name}}</a></li>
                   <ul>
                 </td>
-                <td>{{file.SizeH}}</td>
+                <td @click="clickSubDir(path,file)">{{file.SizeH}}</td>
                 <td>
                   <input type="checkbox" @click="onSelect(file)" v-model="select[file.Name]" data-bs-toggle="offcanvas" data-bs-target="#offcanvas" aria-controls="offcanvas">
                 </td>
-                <td>{{file.ModTimeH}}</td>
+                <td @click="clickSubDir(path,file)">{{file.ModTimeH}}</td>
               </tr>
-<!--               <render-file -->
-<!--                 v-for="file in files" -->
-<!--                 v-bind:file="file" -->
-<!--                 v-bind:path="path" -->
-<!--                 v-bind:select="select" -->
-<!--                 :hash="hash" -->
-<!--                 v-bind:key="file.Hash" -->
-<!--                 ></render-file> -->
             </tbody>
           </table>
         </div>

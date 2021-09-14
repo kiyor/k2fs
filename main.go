@@ -11,6 +11,8 @@ import (
 	"runtime"
 	"text/template"
 
+	"github.com/NYTimes/gziphandler"
+	"github.com/bluele/gcache"
 	"github.com/gorilla/mux"
 )
 
@@ -60,6 +62,7 @@ func universal(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	flag.Parse()
+	cache = gcache.New(cacheMax).LRU().Expiration(cacheTimeout).Build()
 	addr = intf + port
 	Trash = filepath.Join(rootDir, ".Trash")
 	if _, err := os.Stat(Trash); err != nil {
@@ -84,6 +87,7 @@ func main() {
 	r.PathPrefix("/photo").HandlerFunc(renderPhoto)
 	r.PathPrefix("/").HandlerFunc(universal)
 	handler := NewLogHandler().Handler(r)
+	handler = gziphandler.GzipHandler(handler)
 	http.Handle("/", handler)
 	log.Fatal(http.ListenAndServe(addr, nil))
 }

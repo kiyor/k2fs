@@ -27,7 +27,8 @@ func NewResp(w http.ResponseWriter, data interface{}, code ...int) []byte {
 		Code: c,
 		Data: data,
 	}
-	b, err := json.MarshalIndent(r, "", "  ")
+	// 	b, err := json.MarshalIndent(r, "", "  ")
+	b, err := json.Marshal(r)
 	if err != nil {
 		log.Println(err)
 	}

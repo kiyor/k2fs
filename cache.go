@@ -1,9 +1,17 @@
 package main
 
 import (
+	"flag"
 	"time"
 
 	"github.com/bluele/gcache"
 )
 
-var cache = gcache.New(2000).LRU().Expiration(2 * time.Minute).Build()
+var cacheTimeout time.Duration
+var cacheMax int
+var cache gcache.Cache
+
+func init() {
+	flag.DurationVar(&cacheTimeout, "cache-timeout", 2*time.Minute, "cache timeout")
+	flag.IntVar(&cacheMax, "cache-max", 2000, "cache max")
+}

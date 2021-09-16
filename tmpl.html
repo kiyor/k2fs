@@ -54,6 +54,21 @@
       </div>
     </div>
 
+    <div v-if="false" id="debug">
+      <ul>
+        <li>
+          history: {{history}}
+        </li>
+        <li>
+          lastLabel: {{lastLabel}}
+        </li>
+        <li>
+          hash: {{hash}}
+        </li>
+      </ul>
+
+    </div>
+
     <div v-bind:class="class_container">
       <div class="row">
         <div class="col-11">
@@ -73,7 +88,7 @@
                 <td v-bind:name="file.Hash" v-bind:id="file.Hash">
                   <i v-if="file.Meta.Star" class="fas fa-star"></i>
                   <span v-if="file.IsDir" @click="clickSubDir(path,file)"><i class="far fa-folder-open"></i></span>
-                  <span v-if="file.IsDir" @click="clickDir(path,file)" v-bind:class="checkTextClass(file)"> {{file.Name}}</span>
+                  <span v-if="file.IsDir" @click.prevent="onClick(path,file)"> {{file.Name}}</span>
                   <i v-if="!file.IsDir" class="far fa-file"></i>
                   <a v-if="!file.IsDir" :href="getLink(path,file)" target="_blank"> {{file.Name}}</a>
                   <ul v-if="isOpened(path,file)">

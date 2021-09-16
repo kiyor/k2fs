@@ -7,7 +7,7 @@ release:
 .PHONY: release
 
 build:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -v ${LDFLAGS} -o ./k2fs .
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod vendor -a -installsuffix cgo -v ${LDFLAGS} -o ./k2fs .
 .PHONY: build
 
 image:
@@ -15,6 +15,6 @@ image:
 .PHONY: image
 
 arm7:
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -a -installsuffix cgo -v ${LDFLAGS} -o ./k2fs .
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -mod vendor -a -installsuffix cgo -v ${LDFLAGS} -o ./k2fs .
 	docker build -f Dockerfile.arm7 -t kiyor/k2fs:arm7 . && docker push kiyor/k2fs:arm7
 .PHONY: arm7

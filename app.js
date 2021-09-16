@@ -52,38 +52,66 @@ const myapp = {
       path: _pathname,
       dir: "",
       updir: "",
-      hash: [],
       resp: {},
       select: {},
       files: [],
       subListOpen: {}, // open sub folder, path: bool
       subList: {}, // open sub folder, path: files
       labelMap: {}, // backup label color
-      lastLabel: "", // the last click folder
+      lastLabel: "", // the last click folder name
       desc: "1",
+      clickCounter: 0,
+      clickTimer: null,
+      history: [],
     }
   },
   mounted() {
-    //     console.log(this.path); 
-    //     console.log(this.dir); 
     this.listApi(this.path);
+    var p = this.path.trimRight("/").split("/")
+    for (let k in p) {
+      if (k > 0) {
+        this.history[k - 1] = p[k] + "/";
+      }
+    }
+    //     console.log(this.history); 
   },
   methods: {
-    clickDir(path, file) {
+    onClick(path, file) {
       if (!file.IsDir) {
         return
       }
-      this.path = this.getSub(path, file.Name);
-      this.listApi(this.path);
+
+      this.clickCounter++;
+      if (this.clickCounter === 1) { // single click
+        this.clickTimer = setTimeout(() => {
+          this.clickSubDir(path, file);
+          this.clickCounter = 0;
+        }, 300);
+      } else {
+        clearTimeout(this.clickTimer);
+        this.clickDir(path, file);
+        this.clickCounter = 0;
+      }
+    },
+    async clickDir(path, file) {
+      var sub = this.getSub(path, file.Name);
+      var p = sub.split("/")
+      for (let k in p) {
+        if (k > 0) {
+          this.history[k - 1] = p[k] + "/";
+        }
+      }
+      //       console.log(this.history); 
+      this.path = sub;
+      console.log(1);
+      await this.listApi(this.path);
       var nextURL = _host + this.path;
       var nextTitle = '';
       var nextState = {
         additionalInformation: ''
       };
       window.history.pushState(nextState, nextTitle, nextURL);
-      console.log(this.resp.Hash);
-      this.hash.push(this.resp.Hash);
-      console.log(this.hash);
+      console.log(2);
     },
     isOpened(path, file) {
       if (!file.IsDir) {
@@ -122,49 +150,50 @@ const myapp = {
       } else {
         this.subListOpen[sub] = !this.subListOpen[sub]
       }
+      this.lastLabel = file.Name;
+      //       console.log("lastLabel: " + this.lastLabel); 
       // if make it open, clean up other open folder
       if (this.subListOpen[sub]) {
         this.listSubApi(sub);
-        file.Meta.Label = "dark";
-        this.lastLabel = file.Name;
+        //         file.Meta.Label = "dark"; 
         for (let k in this.subListOpen) {
           if (k !== sub) {
             this.subListOpen[k] = false;
           }
         }
       }
+    },
+    colorCleaner() {
       // roll back other folder label color exect last folder
       for (let i = 0; i < this.files.length; i++) {
-        if (this.lastLabel === this.files[i].Name) {} else {
+        if (this.lastLabel === this.files[i].Name) {
+          this.files[i].Meta.Label = "dark";
+        } else if (this.history[this.history.length - 1] === this.files[i].Name) {
+          this.files[i].Meta.Label = "dark";
+        } else {
           this.files[i].Meta.Label = this.labelMap[this.files[i].Name];
         }
       }
+      console.log("colorCleaner finished")
     },
-    clickUpDir(path) {
+    async clickUpDir(path) {
       this.path = this.resp.UpDir;
-      var hash = this.resp.Hash
-      this.listApi(this.path);
-      console.log(hash);
+      console.log(1);
+      await this.listApi(this.path);
       var nextURL = _host + this.path;
       var nextTitle = '';
       var nextState = {
         additionalInformation: ''
       };
       window.history.pushState(nextState, nextTitle, nextURL);
-      console.log(this.hash);
+      //       console.log(this.history); 
+      console.log(2);
+      this.colorCleaner();
+      this.history.pop();
     },
     onSelect(file) {
       console.log(this.select);
       _show();
-    },
-    checkTextClass(file) {
-      if (this.hash[this.hash.length - 1] === file.Hash) {
-        return "text-warning"
-      }
-      if (this.hash.includes(file.Hash)) {
-        return "text-danger"
-      }
-      return ""
     },
     checkTableClass(file) {
       if (file.Meta.Label.length > 0) {
@@ -188,11 +217,11 @@ const myapp = {
           console.log(error)
         })
     },
-    listApi(path) {
+    async listApi(path) {
       var data = {};
       data.path = path;
       data.list = "read";
-      axios.post("/api?action=list", data)
+      await axios.post("/api?action=list", data)
         .then(response => {
           this.resp = response.data.Data;
           this.updir = this.resp.UpDir;
@@ -201,27 +230,31 @@ const myapp = {
           for (let i = 0; i < this.files.length; i++) {
             this.labelMap[this.files[i].Name] = this.files[i].Meta.Label;
           }
-          console.log(this.resp);
-          console.log(this.labelMap);
+          //           console.log(this.resp); 
+          //           console.log(this.labelMap); 
+          console.log("listApi finished");
         })
         .catch(error => {
           console.log(error)
         })
+      await this.colorCleaner();
     },
-    listSubApi(path) {
+    async listSubApi(path) {
       var data = {};
       data.path = path;
       data.listdir = "find";
-      axios.post("/api?action=list", data)
+      await axios.post("/api?action=list", data)
         .then(response => {
           var resp = response.data.Data;
           this.subList[path] = resp.Files;
-          console.log(this.resp);
-          console.log(this.subList);
+          //           console.log(this.resp); 
+          //           console.log(this.subList); 
+          console.log("listSubApi finished");
         })
         .catch(error => {
           console.log(error)
         })
+      await this.colorCleaner();
     },
     sortByApi(thing) {
       if (this.desc === "1") {

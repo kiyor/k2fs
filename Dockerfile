@@ -1,7 +1,8 @@
 FROM golang:1.17 as builder
 WORKDIR /go/src/k2fs
+COPY vendor ./vendor
 COPY * ./
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o k2fs .
+RUN CGO_ENABLED=0 GOOS=linux go build -mod vendor -a -installsuffix cgo -o k2fs .
 
 FROM alpine
 RUN apk update && apk add ca-certificates && rm -rf /var/cache/apk/*

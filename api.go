@@ -57,12 +57,15 @@ func NewDir() *Dir {
 
 type File struct {
 	Name     string
+	Path     string
 	Hash     string
 	Size     int64
 	SizeH    string
 	IsDir    bool
 	ModTime  time.Time
 	ModTimeH string
+
+	ShortCut string
 
 	Meta kfs.MetaInfo
 }

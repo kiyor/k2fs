@@ -34,8 +34,26 @@ var _show = function() {
 }
 
 var _jump = function(h) {
-  var top = document.getElementById(h).offsetTop; //Getting Y of target element
-  window.scrollTo(0, top); //Go there directly or some transition
+  let a = document.getElementById(h)
+  if (a != undefined) {
+    let top = a.offsetTop; //Getting Y of target element
+    window.scrollTo(0, top); //Go there directly or some transition
+  }
+}
+
+var _getQS = function(param) {
+  var sPageURL = window.location.search.substring(1),
+    sURLVariables = sPageURL.split(/[&||?]/),
+    res;
+  for (var i = 0; i < sURLVariables.length; i += 1) {
+    var paramName = sURLVariables[i],
+      sParameterName = (paramName || '').split('=');
+
+    if (sParameterName[0] === param) {
+      res = sParameterName[1];
+    }
+  }
+  return res;
 }
 
 String.prototype.trimRight = function(charlist) {
@@ -65,12 +83,23 @@ const myapp = {
       history: [],
     }
   },
-  mounted() {
-    this.listApi(this.path);
+  async mounted() {
+    await this.listApi(this.path);
     var p = this.path.trimRight("/").split("/")
     for (let k in p) {
       if (k > 0) {
         this.history[k - 1] = p[k] + "/";
+      }
+    }
+    var q = _getQS('q');
+    if (q != undefined) {
+      for (let i = 0; i < this.files.length; i++) {
+        if (this.files[i].Name.includes(q)) {
+          _jump(this.files[i].Hash);
+          this.lastLabel = this.files[i].Name;
+          this.colorCleaner();
+          break;
+        }
       }
     }
     //     console.log(this.history); 
@@ -125,11 +154,18 @@ const myapp = {
     trimRight(a, b) {
       return a.trimRight(b);
     },
+    open(file) {
+      console.log(file.ShortCut);
+    },
     getSubLink(path, file, sub) { // string path, object file and object sub
       if (sub.IsDir) {
         return path.trimRight('/') + '/' + file.Name + sub.Name;
       } else {
-        return '/statics' + path.trimRight('/') + '/' + file.Name + sub.Name;
+        if (sub.ShortCut.length > 0) {
+          return sub.ShortCut;
+        } else {
+          return '/statics' + path.trimRight('/') + '/' + file.Name + sub.Path;
+        }
       }
     },
     getLink(path, file) {
@@ -176,7 +212,7 @@ const myapp = {
       }
       console.log("colorCleaner finished")
     },
-    async clickUpDir(path) {
+    async clickUpDir() {
       this.path = this.resp.UpDir;
       console.log(1);
       await this.listApi(this.path);
@@ -191,7 +227,7 @@ const myapp = {
       this.colorCleaner();
       this.history.pop();
     },
-    onSelect(file) {
+    onSelect() {
       console.log(this.select);
       _show();
     },
@@ -237,7 +273,10 @@ const myapp = {
         .catch(error => {
           console.log(error)
         })
-      await this.colorCleaner();
+      this.colorCleaner();
+      var i = this.history[this.history.length - 1];
+      console.log("need scrollTo: " + i);
+      _jump(i);
     },
     async listSubApi(path) {
       var data = {};
@@ -254,7 +293,7 @@ const myapp = {
         .catch(error => {
           console.log(error)
         })
-      await this.colorCleaner();
+      this.colorCleaner();
     },
     sortByApi(thing) {
       if (this.desc === "1") {

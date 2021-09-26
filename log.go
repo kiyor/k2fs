@@ -70,7 +70,8 @@ func (l *LogHandler) Handler(next http.Handler) http.Handler {
 		if len(r.URL.Query()) > 0 {
 			reqURI += "?" + r.URL.Query().Encode()
 		}
-		res := fmt.Sprintf("%v %v %v %v %v %v", r.RemoteAddr, writer.status, writer.length, r.Method, reqURI, time.Since(t1))
+		ua := r.Header.Get("User-Agent")
+		res := fmt.Sprintf("%v %v %v %v %v %v '%v'", r.RemoteAddr, writer.status, writer.length, r.Method, reqURI, time.Since(t1), ua)
 		l.l.Println(res)
 	})
 }

@@ -15,7 +15,13 @@ import (
 )
 
 var (
-	photoExt = []string{".jpg", ".png", ".gif", ".jpeg"}
+	photoExt = []string{
+		".jpg",
+		".png",
+		".gif",
+		".jpeg",
+		".bmp",
+	}
 
 	//go:embed photo.html
 	photoTmpl string

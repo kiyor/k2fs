@@ -5,8 +5,10 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -28,6 +30,33 @@ var hideExt = []string{
 }
 var hideContain = []string{
 	"padding_file",
+}
+var videoExt = []string{
+	".mp4",
+	".avi",
+	".wmv",
+	".mkv",
+	".ts",
+}
+
+func isVideo(file string) bool {
+	ext := strings.ToLower(filepath.Ext(file))
+	for _, v := range videoExt {
+		if v == ext {
+			return true
+		}
+	}
+	return false
+}
+
+var reMac = regexp.MustCompile(`Macintosh; Intel Mac OS X .*\) AppleWebKit\/.* \(KHTML, like Gecko\) Chrome\/.* Safari\/.*`)
+
+func isMac(r *http.Request) bool {
+	ag := r.Header.Get("User-Agent")
+	if reMac.MatchString(ag) {
+		return true
+	}
+	return false
 }
 
 func needHide(path string) bool {
@@ -85,7 +114,7 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 	session, _ := store.Get(r, APP)
 	if f.IsDir() {
 		var fs []string
-		var list []os.FileInfo
+		var list map[string]os.FileInfo
 		if isRead {
 			fs, err = ioReadDir(path)
 		}
@@ -96,7 +125,7 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 			NewErrResp(w, 1, err)
 			return
 		}
-		list, err = slice2fileinfo(fs)
+		list, err = slice2fileinfo(fs, path)
 		if err != nil {
 			NewErrResp(w, 1, err)
 			return
@@ -107,7 +136,7 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 		dir.UpDir = upDir(dir.Dir)
 
 		meta := kfs.NewMeta(path)
-		for _, f := range list {
+		for p, f := range list {
 			nf := NewFile(f.Name())
 			nf.Hash = hash(filepath.Join(path, f.Name()))
 			if isRead {
@@ -119,6 +148,7 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 			}
 			if isFind {
 				nf.Size = f.Size()
+				nf.Path = p
 			}
 			nf.SizeH = humanize.IBytes(uint64(nf.Size))
 			nf.ModTime = f.ModTime()
@@ -129,6 +159,17 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 			}
 			if m, ok := meta.Get(nf.Name); ok {
 				nf.Meta = m
+			}
+			fp := filepath.Join("/statics", m["path"], p)
+			if isMac(r) && isVideo(nf.Name) {
+				host := "http://" + r.Host
+				qv := url.Values{}
+				qv["url"] = []string{host + fp}
+				replacer := strings.NewReplacer("+", "%20")
+				q := replacer.Replace(qv.Encode())
+				nf.ShortCut = "iina://open?" + q
+			} else {
+				nf.ShortCut = fp
 			}
 			dir.Files = append(dir.Files, nf)
 		}
@@ -209,8 +250,8 @@ func ioReadDir(root string) ([]string, error) {
 	return files, nil
 }
 
-func slice2fileinfo(s []string) ([]os.FileInfo, error) {
-	var fs []os.FileInfo
+func slice2fileinfo(s []string, prefix string) (map[string]os.FileInfo, error) {
+	fs := make(map[string]os.FileInfo)
 	for _, v := range s {
 		if needHide(v) {
 			continue
@@ -219,7 +260,7 @@ func slice2fileinfo(s []string) ([]os.FileInfo, error) {
 		if err != nil {
 			return fs, err
 		}
-		fs = append(fs, f)
+		fs[v[len(prefix)+1:]] = f
 	}
 	return fs, nil
 }

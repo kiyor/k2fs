@@ -17,10 +17,11 @@ import (
 )
 
 var (
-	addr    string
-	rootDir string
-	intf    string
-	port    string
+	addr     string
+	rootDir  string
+	intf     string
+	port     string
+	flagHost string
 
 	//go:embed tmpl.html
 	basicView string
@@ -38,6 +39,7 @@ func init() {
 	flag.StringVar(&intf, "i", "0.0.0.0", "http service interface address")
 	flag.StringVar(&port, "l", ":8080", "http service listen port")
 	flag.StringVar(&rootDir, "root", ".", "root dir")
+	flag.StringVar(&flagHost, "host", "", "host if need overwrite; syntax like http://a.com(:8080)")
 }
 
 func universal(w http.ResponseWriter, r *http.Request) {
@@ -51,6 +53,9 @@ func universal(w http.ResponseWriter, r *http.Request) {
 		scheme = "https"
 	}
 	u := scheme + "://" + r.Host
+	if len(flagHost) > 0 {
+		u = flagHost
+	}
 	var t *template.Template
 	// 	if _, err := os.Stat("tmpl.html"); err == nil {
 	// 		t, _ = template.New("").Delims("[[", "]]").ParseFiles("tmpl.html")
@@ -62,6 +67,9 @@ func universal(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	flag.Parse()
+	if rootDir == "." {
+		rootDir, _ = os.Getwd()
+	}
 	cache = gcache.New(cacheMax).LRU().Expiration(cacheTimeout).Build()
 	addr = intf + port
 	Trash = filepath.Join(rootDir, ".Trash")

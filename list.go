@@ -163,13 +163,17 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 			fp := filepath.Join("/statics", m["path"], p)
 			if isMac(r) && isVideo(nf.Name) {
 				host := "http://" + r.Host
+				if len(flagHost) > 0 {
+					host = flagHost
+				}
 				qv := url.Values{}
 				qv["url"] = []string{host + fp}
-				replacer := strings.NewReplacer("+", "%20")
+				replacer := strings.NewReplacer("+", "%20", "#", "%23")
 				q := replacer.Replace(qv.Encode())
 				nf.ShortCut = "iina://open?" + q
 			} else {
-				nf.ShortCut = fp
+				replacer := strings.NewReplacer("#", "%23")
+				nf.ShortCut = replacer.Replace(fp)
 			}
 			dir.Files = append(dir.Files, nf)
 		}

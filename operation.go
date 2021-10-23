@@ -30,6 +30,8 @@ func apiOperation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 	log.Println(toJSON(op))
+
 	path := filepath.Join(rootDir, op.Dir)
 
 	meta := kfs.NewMeta(path)
@@ -49,6 +51,14 @@ func apiOperation(w http.ResponseWriter, r *http.Request) {
 				meta.Set(k, m)
 			case op.Action == "star":
 				m.Star = !m.Star
+				meta.Set(k, m)
+			case strings.HasPrefix(op.Action, "star"):
+				to := strings.Split(op.Action, "=")
+				if len(to) > 1 && len(to[1]) > 0 {
+					m.Star = true
+				} else {
+					m.Star = false
+				}
 				meta.Set(k, m)
 			case op.Action == "delete":
 				log.Println(file, Trash)

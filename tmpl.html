@@ -90,7 +90,8 @@
                   <span v-if="file.IsDir" @click="clickSubDir(path,file)"><i class="far fa-folder-open"></i></span>
                   <span v-if="file.IsDir" @click.prevent="onClick(path,file)"> {{file.Name}}</span>
                   <i v-if="!file.IsDir" class="far fa-file"></i>
-                  <a v-if="!file.IsDir" :href="file.ShortCut" target="_blank"> {{file.Name}}</a>
+                  <a v-if="!file.IsDir" @click="clickFile(file)" :href="file.ShortCut" target="_blank">
+                    {{file.Name}}</a>
                   <ul v-if="isOpened(path,file)">
                     <li v-for="sub in subList[getSub(path,file.Name)]">
                       <a target="_blank" :href="getSubLink(path,file,sub)">{{sub.Name}}</a>

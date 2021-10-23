@@ -142,6 +142,10 @@ const myapp = {
       window.history.pushState(nextState, nextTitle, nextURL);
       console.log(2);
     },
+    clickFile(file) {
+      this.lastLabel = file.Name;
+      this.colorCleaner();
+    },
     isOpened(path, file) {
       if (!file.IsDir) {
         return false;

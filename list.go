@@ -26,6 +26,7 @@ var hideExt = []string{
 	".TODO",
 	".URL",
 	".HTM",
+	".HTML",
 	kfs.KFS,
 }
 var hideContain = []string{
@@ -37,6 +38,9 @@ var videoExt = []string{
 	".wmv",
 	".mkv",
 	".ts",
+	".flv",
+	".mpg",
+	".dat",
 }
 
 func isVideo(file string) bool {

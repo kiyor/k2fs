@@ -2,10 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -41,6 +43,30 @@ func apiOperation(w http.ResponseWriter, r *http.Request) {
 		if b {
 			m, _ := meta.Get(k)
 			switch {
+			case op.Action == "unzip":
+				var cmd string
+				var c *exec.Cmd
+				d := filepath.Dir(file)
+				f := filepath.Base(file)
+				b := filepath.Join(d, f[:len(f)-4])
+				err := os.Mkdir(b, 0755)
+				if err != nil {
+					log.Println(err)
+					return
+				}
+				switch filepath.Ext(strings.ToLower(file)) {
+				case ".rar":
+					cmd = fmt.Sprintf("unrar -y e '%s' '%s'", f, b)
+					c = exec.Command("/bin/sh", "-c", cmd)
+				case ".zip":
+					cmd = fmt.Sprintf("unzip '%s' -d '%s'", f, b)
+					c = exec.Command("/bin/sh", "-c", cmd)
+				}
+				c.Dir = d
+				log.Println(d, cmd)
+				c.Stderr = os.Stderr
+				c.Stdout = os.Stdout
+				c.Run()
 			case strings.HasPrefix(op.Action, "label"):
 				to := strings.Split(op.Action, "=")
 				if len(to) > 1 {

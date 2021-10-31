@@ -24,7 +24,7 @@
   }
 
   table {
-    font-size: 2.0em;
+    font-size: 1.6em;
   }
 
   @media (max-width: 980px) {
@@ -142,6 +142,7 @@
         </div>
         <hr />
         <div class="btn-group-vertical" role="group" aria-label="Vertical button group">
+          <button type="button" class="btn btn-lg" @click="operation('unzip')"><i class="fas fa-box-open"></i></button>
           <button type="button" class="btn btn-lg" @click="operation('star')"><i class="fas fa-star"></i></button>
           <button type="button" class="btn btn-lg btn-light" @click="operation('label')">Label 0</button>
           <button type="button" class="btn btn-lg btn-success" @click="operation('label=success')">Label 1</button>

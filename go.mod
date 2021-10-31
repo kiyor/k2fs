@@ -1,6 +1,6 @@
 module github.com/kiyor/k2fs
 
-go 1.16
+go 1.17
 
 require (
 	github.com/NYTimes/gziphandler v1.1.1
@@ -11,3 +11,5 @@ require (
 	github.com/kiyor/kfs v0.0.0-20210202184223-a1e387a86196
 	github.com/kiyor/terminal v1.0.0
 )
+
+require github.com/gorilla/securecookie v1.1.1 // indirect

@@ -2,6 +2,8 @@
 
 - this is second browsable file server I build for management of BT download
 - it able to flag file with different color
+- open video in IINA if use MAC's Chrome, install IINA and IINA plugin for Chrome first
+- ios device suggest use nPlayer browser open video
 - able to render all subfolder's photo in single page
 - it can unzip file without manually work
 - click func show func

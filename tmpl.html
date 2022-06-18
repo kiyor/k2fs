@@ -19,17 +19,39 @@
 
 </head>
 <style>
+  .blink_me {
+    animation: blinker 1s linear infinite;
+  }
+  
+  @keyframes blinker {
+    50% {
+      opacity: 0;
+    }
+  }
   body {
     font-family: "Microsoft Yahei", "Helvetica Neue", "Luxi Sans", "DejaVu Sans", Tahoma, "Hiragino Sans GB", STHeiti;
   }
 
-  table {
+  .lg {
     font-size: 1.6em;
+  }
+  .sm {
+    font-size: 1.0em;
+  }
+
+  .fas {
+    padding: 6px;
+  }
+  .far {
+    padding: 6px;
   }
 
   @media (max-width: 980px) {
-    table {
+    .lg {
       font-size: 1.0em;
+    }
+    .sm {
+      font-size: 0.9em;
     }
   }
 </style>
@@ -70,11 +92,16 @@
     </div>
 
     <div v-bind:class="class_container">
+      <div>
+        <ul>
+          <li v-for="p in df"><span :class="dfColor(p.usedPercent)">{{p.path}} - {{p.usedPercent}}%</span></li>
+        </ul>
+      </div>
       <div class="row">
         <div class="col-11">
           <table class="table table-hover">
             <thead>
-              <tr>
+              <tr class="lg">
                 <th><a v-on:click="sortByApi('name')">Name</a></th>
                 <th><a v-on:click="sortByApi('size')">Size</a></th>
                 <th>Func</th>
@@ -84,16 +111,19 @@
 
             <tbody>
 
-              <tr v-for="file in files" v-bind:class="checkTableClass(file)" v-bind:id="file.Name">
+              <tr class="lg" v-for="file in files" v-bind:class="checkTableClass(file)" v-bind:id="file.Name">
                 <td v-bind:name="file.Hash" v-bind:id="file.Hash">
                   <i v-if="file.Meta.Star" class="fas fa-star"></i>
+                  <span v-for="icon in file.Meta.Icons">
+                    <i v-bind:class="icon"></i>
+                  </span>
                   <span v-if="file.IsDir" @click="clickSubDir(path,file)"><i class="far fa-folder-open"></i></span>
                   <span v-if="file.IsDir" @click.prevent="onClick(path,file)"> {{file.Name}}</span>
                   <i v-if="!file.IsDir" class="far fa-file"></i>
                   <a v-if="!file.IsDir" @click="clickFile(file)" :href="file.ShortCut" target="_blank">
                     {{file.Name}}</a>
                   <ul v-if="isOpened(path,file)">
-                    <li v-for="sub in subList[getSub(path,file.Name)]">
+                    <li class="sm" v-for="sub in subList[getSub(path,file.Name)]">
                       <a target="_blank" :href="getSubLink(path,file,sub)">{{sub.Name}}</a>
                     </li>
                   </ul>
@@ -144,6 +174,14 @@
         <div class="btn-group-vertical" role="group" aria-label="Vertical button group">
           <button type="button" class="btn btn-lg" @click="operation('unzip')"><i class="fas fa-box-open"></i></button>
           <button type="button" class="btn btn-lg" @click="operation('star')"><i class="fas fa-star"></i></button>
+          <hr>
+          <div class="btn-group" role="group">
+            [[range slice "horse" "male"]]
+            <label class="btn btn-outline-dark" @click="operation('icons=fas fa-[[.]]')"><i class="fas fa-[[.]]"></i></label>
+            [[end]]
+            <label class="btn btn-outline-dark" @click="operation('icons=')"><i class="fas fa-broom"></i></label>
+          </div>
+          <hr>
           <button type="button" class="btn btn-lg btn-light" @click="operation('label')">Label 0</button>
           <button type="button" class="btn btn-lg btn-success" @click="operation('label=success')">Label 1</button>
           <button type="button" class="btn btn-lg btn-info" @click="operation('label=info')">Label 2</button>
@@ -164,7 +202,7 @@
     integrity="sha384-/bQdsTh/da6pkI1MST/rWKFNjaCP5gBSY4sEBT38Q/9RBh9AH40zEOg7Hlq2THRZ"
     crossorigin="anonymous"></script>
   <script>
-    var _host = '[[.]]';
+    var _host = '[[.host]]';
   </script>
   <script src="/app.js"></script>
 </body>

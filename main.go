@@ -28,6 +28,8 @@ var (
 
 	//go:embed app.js
 	appjs string
+
+	flagDf flagSliceString
 )
 
 const (
@@ -40,6 +42,7 @@ func init() {
 	flag.StringVar(&port, "l", ":8080", "http service listen port")
 	flag.StringVar(&rootDir, "root", ".", "root dir")
 	flag.StringVar(&flagHost, "host", "", "host if need overwrite; syntax like http://a.com(:8080)")
+	flag.Var(&flagDf, "df", "monitor mount dir")
 }
 
 func universal(w http.ResponseWriter, r *http.Request) {
@@ -52,17 +55,36 @@ func universal(w http.ResponseWriter, r *http.Request) {
 	if r.TLS != nil {
 		scheme = "https"
 	}
+	m := make(map[string]interface{})
 	u := scheme + "://" + r.Host
 	if len(flagHost) > 0 {
 		u = flagHost
 	}
+	m["host"] = u
+	// 	usage := DiskSize([]string(flagDf))
+	// 	m["usage"] = usage
 	var t *template.Template
 	// 	if _, err := os.Stat("tmpl.html"); err == nil {
 	// 		t, _ = template.New("").Delims("[[", "]]").ParseFiles("tmpl.html")
 	// 	} else {
-	t, _ = template.New("").Delims("[[", "]]").Parse(basicView)
+	t, _ = template.New("").Delims("[[", "]]").Funcs(
+		template.FuncMap{
+			"slice": genSlice,
+		},
+	).Parse(basicView)
 	// 	}
-	t.Execute(w, u)
+	t.Execute(w, m)
+}
+
+func genSlice(i ...interface{}) chan interface{} {
+	o := make(chan interface{})
+	go func() {
+		for _, v := range i {
+			o <- v
+		}
+		close(o)
+	}()
+	return o
 }
 
 func main() {

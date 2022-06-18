@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	kfs "github.com/kiyor/kfs/lib"
+	kfs "github.com/kiyor/k2fs/lib"
 )
 
 // Operation api request
@@ -73,6 +73,15 @@ func apiOperation(w http.ResponseWriter, r *http.Request) {
 					m.Label = to[1]
 				} else {
 					m.Label = ""
+				}
+				meta.Set(k, m)
+			case strings.HasPrefix(op.Action, "icons"):
+				to := strings.Split(op.Action, "=")
+				m.Icons = []string{}
+				if len(to) > 1 {
+					m.Icons = append(m.Icons, to[1])
+				} else {
+					m.Icons = []string{}
 				}
 				meta.Set(k, m)
 			case op.Action == "star":

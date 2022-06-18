@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	kfs "github.com/kiyor/kfs/lib"
+	kfs "github.com/kiyor/k2fs/lib"
 )
 
 type Resp struct {
@@ -96,9 +96,16 @@ func api(w http.ResponseWriter, r *http.Request) {
 		apiSession(w, r)
 	case "operation":
 		apiOperation(w, r)
+	case "df":
+		apiDf(w, r)
 	default:
 		w.Write([]byte("api ok"))
 	}
+}
+
+func apiDf(w http.ResponseWriter, r *http.Request) {
+	du := DiskSize([]string(flagDf))
+	w.Write([]byte(toJSON(du)))
 }
 
 func dirSize(path string) (int64, error) {

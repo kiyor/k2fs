@@ -63,12 +63,17 @@ String.prototype.trimRight = function(charlist) {
   return this.replace(new RegExp("[" + charlist + "]+$"), "");
 };
 
+window.onload = function() {
+  document.getElementsByClassName("blink_me").fadeOut(3000).fadeIn(3000, blink);
+}
+
 const myapp = {
   data() {
     return {
       class_container: "container-lg",
       path: _pathname,
       dir: "",
+      df: [],
       updir: "",
       resp: {},
       select: {},
@@ -84,6 +89,7 @@ const myapp = {
     }
   },
   async mounted() {
+    this.getDf();
     await this.listApi(this.path);
     var p = this.path.trimRight("/").split("/")
     for (let k in p) {
@@ -109,6 +115,8 @@ const myapp = {
       if (!file.IsDir) {
         return
       }
+
+      this.getDf();
 
       this.clickCounter++;
       if (this.clickCounter === 1) { // single click
@@ -171,6 +179,25 @@ const myapp = {
           return '/statics' + path.trimRight('/') + '/' + file.Name + sub.Path;
         }
       }
+    },
+    dfColor(p) {
+      if (p > 95) {
+        return "text-danger blink_me"
+      } else if (p > 85) {
+        return "text-warning blink_me"
+      } else {
+        return ""
+      }
+    },
+    getDf() {
+      axios.get("/api?action=df")
+        .then(response => {
+          console.log(response.data);
+          this.df = response.data;
+        })
+        .catch(error => {
+          console.log(error)
+        })
     },
     getLink(path, file) {
       return '/statics' + path + '/' + file.Name;
@@ -246,11 +273,13 @@ const myapp = {
       data.files = this.select;
       data.dir = this.path;
       data.action = action;
+      console.log(data);
       axios.post("/api?action=operation", data)
         .then(response => {
           console.log(response.data);
           this.select = {};
           this.listApi(this.path);
+          this.getDf();
           _hide();
         })
         .catch(error => {

@@ -8,8 +8,13 @@ require (
 	github.com/dustin/go-humanize v1.0.0
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/sessions v1.2.1
-	github.com/kiyor/kfs v0.0.0-20210202184223-a1e387a86196
 	github.com/kiyor/terminal v1.0.0
+	github.com/shirou/gopsutil v3.21.10+incompatible
 )
 
-require github.com/gorilla/securecookie v1.1.1 // indirect
+require (
+	github.com/StackExchange/wmi v1.2.1 // indirect
+	github.com/go-ole/go-ole v1.2.5 // indirect
+	github.com/gorilla/securecookie v1.1.1 // indirect
+	golang.org/x/sys v0.0.0-20190916202348-b4ddaad3f8a3 // indirect
+)

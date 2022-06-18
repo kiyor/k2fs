@@ -13,7 +13,7 @@ import (
 	"strings"
 
 	"github.com/dustin/go-humanize"
-	kfs "github.com/kiyor/kfs/lib"
+	kfs "github.com/kiyor/k2fs/lib"
 )
 
 var hideExt = []string{
@@ -34,6 +34,7 @@ var hideContain = []string{
 }
 var videoExt = []string{
 	".mp4",
+	".mov",
 	".avi",
 	".wmv",
 	".mkv",
@@ -53,11 +54,21 @@ func isVideo(file string) bool {
 	return false
 }
 
-var reMac = regexp.MustCompile(`Macintosh; Intel Mac OS X .*\) AppleWebKit\/.* \(KHTML, like Gecko\) Chrome\/.* Safari\/.*`)
+var (
+	reMac = regexp.MustCompile(`Macintosh; Intel Mac OS X .*\) AppleWebKit\/.* \(KHTML, like Gecko\) Chrome\/.* Safari\/.*`)
+	reWin = regexp.MustCompile(`Mozilla\/.* \(Windows NT .*; Win.*; .*\) AppleWebKit\/.* \(KHTML, like Gecko\) Chrome\/.* Safari\/.*`)
+)
 
 func isMac(r *http.Request) bool {
 	ag := r.Header.Get("User-Agent")
 	if reMac.MatchString(ag) {
+		return true
+	}
+	return false
+}
+func isWin(r *http.Request) bool {
+	ag := r.Header.Get("User-Agent")
+	if reWin.MatchString(ag) {
 		return true
 	}
 	return false
@@ -175,6 +186,17 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 				replacer := strings.NewReplacer("+", "%20", "#", "%23")
 				q := replacer.Replace(qv.Encode())
 				nf.ShortCut = "iina://open?" + q
+			} else if isWin(r) && isVideo(nf.Name) {
+				// 				host := "vlc://" + r.Host
+				host := "http://" + r.Host
+				if len(flagHost) > 0 {
+					// 					rp := strings.NewReplacer("http", "vlc", "https", "vlc")
+					// 					host = rp.Replace(flagHost)
+					host = flagHost
+				}
+				replacer := strings.NewReplacer("#", "%23")
+				nf.ShortCut = host + replacer.Replace(fp)
+				log.Println(nf.ShortCut)
 			} else {
 				replacer := strings.NewReplacer("#", "%23")
 				nf.ShortCut = replacer.Replace(fp)

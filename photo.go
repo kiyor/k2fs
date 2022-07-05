@@ -104,9 +104,12 @@ func readDir(path string) (fs []os.FileInfo) {
 }
 
 func readDir2(path string) (fs []string) {
-	err := filepath.Walk(path, func(p string, _ os.FileInfo, err error) error {
+	err := filepath.Walk(path, func(p string, i os.FileInfo, err error) error {
 		if err != nil {
 			return err
+		}
+		if strings.HasPrefix(i.Name(), "._") {
+			return nil
 		}
 		for _, ext := range photoExt {
 			if strings.ToLower(filepath.Ext(p)) == ext {

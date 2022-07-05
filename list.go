@@ -2,6 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -93,6 +97,74 @@ func upDir(path string) string {
 		return path
 	}
 	return path[:len(path)-len(filepath.Base(path))]
+}
+
+type Thumb struct {
+	Path   string
+	Width  int
+	Height int
+}
+
+func apiThumb(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	m := make(map[string]string)
+	err := json.NewDecoder(r.Body).Decode(&m)
+	if err != nil {
+		log.Println(err)
+		NewErrResp(w, 1, err)
+		return
+	}
+	m["path"] = strings.TrimRight(m["path"], "/")
+	if len(m["path"]) == 0 {
+		m["path"] = "/"
+	}
+	m["name"] = strings.TrimRight(m["name"], "/")
+	abs := filepath.Join(rootDir, m["path"], m["name"])
+
+	f, err := os.Stat(abs)
+	if err != nil {
+		log.Println(err)
+		NewErrResp(w, 1, err)
+		return
+	}
+	fp := func(p string) *Thumb {
+		path := filepath.Join("/statics", p)
+		if reader, err := os.Open(filepath.Join(rootDir, p)); err == nil {
+			defer reader.Close()
+			im, _, err := image.DecodeConfig(reader)
+			if err != nil {
+				log.Println(err)
+				return &Thumb{
+					Path: path,
+				}
+			}
+			return &Thumb{
+				Path:   path,
+				Width:  im.Width,
+				Height: im.Height,
+			}
+		} else {
+			log.Println(err)
+			return &Thumb{
+				Path: filepath.Join("/statics", p),
+			}
+		}
+	}
+	if f.IsDir() {
+		fs := readDir2(abs)
+		if len(fs) == 0 {
+			NewResp(w, "")
+			return
+		}
+		for _, v := range fs {
+			if strings.HasSuffix(v, "cover.jpg") {
+				NewResp(w, fp(v))
+				return
+			}
+		}
+		NewResp(w, fp(fs[0]))
+		return
+	}
 }
 
 func apiList(w http.ResponseWriter, r *http.Request) {

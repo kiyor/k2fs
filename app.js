@@ -81,6 +81,8 @@ const myapp = {
       subListOpen: {}, // open sub folder, path: bool
       subList: {}, // open sub folder, path: files
       labelMap: {}, // backup label color
+      thumbHistory: [], // store hovered id
+      thumbCache: new Map(),
       lastLabel: "", // the last click folder name
       desc: "1",
       clickCounter: 0,
@@ -285,6 +287,129 @@ const myapp = {
         .catch(error => {
           console.log(error)
         })
+    },
+    loadPic(pic, file) {
+      this.thumbHistory.push("img_" + file.Hash);
+      let path = this.path.trimRight("/");
+      path = path.trimLeft("/");
+      let cur = document.getElementById(file.Hash);
+      let rect = cur.getBoundingClientRect();
+      let topPos = rect.top;
+      let bottomPos = rect.bottom;
+//       console.log(-topPos); 
+      
+      let a = document.createElement("div");
+      a.setAttribute("class", "thumb");
+      a.setAttribute("id","img_" + file.Hash);
+      let img = document.createElement("img");
+      img.src = pic.Path;
+      img.setAttribute("class", "thumbimg");
+
+      let imgPath = encodeURI(_host + '/photo/' + path + "/" + file.Name);
+      console.log(imgPath);
+
+      a.onclick = function() {
+        window.open(
+          imgPath,
+          '_blank' // <- This is what makes it open in a new window.
+        );
+      }
+
+      if (pic.Height > screen.height) {
+        console.log("case 1 " + pic.Height);
+        if (pic.Width > 1200) {
+          img.width = 1200;
+        } else {
+          img.width = pic.Width;
+        }
+        let zoom = img.width / pic.Width; // like 0.5
+        img.height = pic.Height * zoom;
+        if (img.height > topPos) {
+          a.style.top = "-" + topPos.toString() + "px"; // from top of screen
+        } else {
+          let x = bottomPos - img.height - topPos;
+          a.style.top = x.toString() + "px";
+        }
+        /*
+        if (pic.Height > 4 * screen.height) {
+          img.width = 1200;
+        } else if (pic.Height > 2 * screen.height) {
+          img.height = 2*screen.height;
+        } else {
+          img.height = pic.Height;
+        }
+        */
+        //a.style.top = "-" + topPos.toString() + "px"; // from top of screen
+//         console.log("-" + topPos.toString() + "px"); 
+      } else if (pic.Height > topPos) {
+        console.log("case 2");
+//         console.log(pic.Height); 
+//         console.log(topPos); 
+//         console.log(bottomPos); 
+        img.width = pic.Width;
+        a.style.top = "-" + topPos.toString() + "px";
+//         console.log("-" + topPos.toString() + "px"); 
+      } else {
+        console.log("case 3");
+        img.width = pic.Width;
+//         console.log(pic.Height); 
+//         console.log(topPos); 
+//         console.log(bottomPos); 
+//         console.log(screen.height); 
+        let x = bottomPos - pic.Height - topPos;
+//         topPos = topPos - pic.Height/2 
+        a.style.top = x.toString() + "px";
+//         console.log(x.toString() + "px"); 
+      }
+      
+      a.appendChild(img);
+      cur.appendChild(a);
+    },
+    async showPic(file) {
+      if (this.thumbHistory.length > 0) {
+        for (let i = 0; i < this.thumbHistory.length; i++) {
+          let div = document.getElementById(this.thumbHistory[i]);
+          if (div !== null) {
+            div.remove();
+          }
+        }
+      }
+      if (!file.IsDir) {
+        return
+      }
+      var data = {};
+      data.path = this.path;
+      data.name = file.Name;
+      if (this.thumbCache.has(file.Hash)) {
+        console.log("HIT " + file.Hash);
+        this.loadPic(this.thumbCache.get(file.Hash), file);
+        return
+      }
+      await axios.post("/api?action=thumb", data)
+        .then(response => {
+          if (response.data.Data !== "") {
+            let pic = response.data.Data;
+            this.thumbCache.set(file.Hash,pic);
+            console.log("MISS " + file.Hash);
+            this.loadPic(pic, file);
+          }
+        })
+        .catch(error => {
+          console.log(error)
+        })
+
+      //let img = document.getElementById('img_' + id);
+      //img.style.display = 'inline';
+    },
+    hidePic(file) {
+      if (!file.IsDir) {
+        return
+      }
+      let div = document.getElementById('img_' + file.Hash);
+      if (div !== null) {
+        div.remove();
+        this.thumbHistory.pop();
+      }
     },
     async listApi(path) {
       var data = {};

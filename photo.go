@@ -114,7 +114,7 @@ func readDir2(path string) (fs []string) {
 		for _, ext := range photoExt {
 			if strings.ToLower(filepath.Ext(p)) == ext {
 				f := p[len(rootDir):]
-				log.Println(f)
+				// 				log.Println(f)
 				fs = append(fs, f)
 				break
 			}

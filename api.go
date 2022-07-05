@@ -92,6 +92,8 @@ func api(w http.ResponseWriter, r *http.Request) {
 	switch action {
 	case "list":
 		apiList(w, r)
+	case "thumb":
+		apiThumb(w, r)
 	case "session":
 		apiSession(w, r)
 	case "operation":

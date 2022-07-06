@@ -71,7 +71,6 @@ func renderPhoto(w http.ResponseWriter, r *http.Request) {
 	for _, f := range fs {
 		// 		fp := filepath.Join("/statics", path, f.Name())
 		fp := filepath.Join("/statics", f)
-		log.Println(fp)
 		images.Images = append(images.Images, Image(fp))
 	}
 	f := template.FuncMap{

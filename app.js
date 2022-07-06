@@ -302,7 +302,7 @@ const myapp = {
       a.setAttribute("class", "thumb");
       a.setAttribute("id","img_" + file.Hash);
       let img = document.createElement("img");
-      img.src = pic.Path;
+      img.src = pic.Path + '?max-width=640';
       img.setAttribute("class", "thumbimg");
 
       let imgPath = encodeURI(_host + '/photo/' + path + "/" + file.Name);

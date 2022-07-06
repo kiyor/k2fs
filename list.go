@@ -162,6 +162,7 @@ func apiThumb(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+		sort.Strings(fs)
 		NewResp(w, fp(fs[0]))
 		return
 	}

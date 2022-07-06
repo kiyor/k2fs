@@ -14,6 +14,7 @@ import (
 	"github.com/NYTimes/gziphandler"
 	"github.com/bluele/gcache"
 	"github.com/gorilla/mux"
+	myhttp "github.com/kiyor/k2fs/pkg/http"
 )
 
 var (
@@ -111,7 +112,7 @@ func main() {
 			io.Copy(w, f)
 		}
 	})
-	fileServer := http.FileServer(http.Dir(rootDir))
+	fileServer := myhttp.FileServer(myhttp.Dir(rootDir))
 	r.PathPrefix("/api").HandlerFunc(api)
 	r.PathPrefix("/statics").Handler(http.StripPrefix("/statics", fileServer))
 	r.PathPrefix("/photo").HandlerFunc(renderPhoto)

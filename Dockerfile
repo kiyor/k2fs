@@ -1,7 +1,8 @@
-FROM golang:1.17 as builder
+FROM golang:1.18 as builder
 WORKDIR /go/src/k2fs
 COPY vendor ./vendor
 COPY lib ./lib
+COPY pkg ./pkg
 COPY go.mod go.mod
 COPY go.sum go.sum
 COPY app.js app.js

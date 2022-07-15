@@ -56,6 +56,9 @@ var _getQS = function(param) {
   return res;
 }
 
+var _scale_width = "640";
+var _show_width = 800;
+
 String.prototype.trimRight = function(charlist) {
   if (charlist === undefined)
     charlist = "\s";
@@ -302,7 +305,7 @@ const myapp = {
       a.setAttribute("class", "thumb");
       a.setAttribute("id","img_" + file.Hash);
       let img = document.createElement("img");
-      img.src = pic.Path + '?max-width=640';
+      img.src = pic.Path + '?max-width=' + _scale_width;
       img.setAttribute("class", "thumbimg");
 
       let imgPath = encodeURI(_host + '/photo/' + path + "/" + file.Name);
@@ -317,8 +320,8 @@ const myapp = {
 
       if (pic.Height > screen.height) {
         console.log("case 1 " + pic.Height);
-        if (pic.Width > 1200) {
-          img.width = 1200;
+        if (pic.Width > _show_width) {
+          img.width = _show_width;
         } else {
           img.width = pic.Width;
         }
@@ -373,10 +376,12 @@ const myapp = {
             div.remove();
           }
         }
+        this.thumbHistory = [];
       }
       if (!file.IsDir) {
         return
       }
+      console.log(this.thumbHistory.length);
       var data = {};
       data.path = this.path;
       data.name = file.Name;
@@ -408,7 +413,7 @@ const myapp = {
       let div = document.getElementById('img_' + file.Hash);
       if (div !== null) {
         div.remove();
-        this.thumbHistory.pop();
+//         this.thumbHistory.pop(); 
       }
     },
     async listApi(path) {

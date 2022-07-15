@@ -138,10 +138,15 @@ func apiThumb(w http.ResponseWriter, r *http.Request) {
 					Path: path,
 				}
 			}
+			width, height := im.Width, im.Height
+			if width > 1200 {
+				width = 1200
+				height = int(float64(width) / float64(im.Width) * float64(im.Height))
+			}
 			return &Thumb{
 				Path:   path,
-				Width:  im.Width,
-				Height: im.Height,
+				Width:  width,
+				Height: height,
 			}
 		} else {
 			log.Println(err)
@@ -157,7 +162,7 @@ func apiThumb(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		for _, v := range fs {
-			if strings.HasSuffix(v, "cover.jpg") {
+			if strings.HasSuffix(strings.ToLower(v), "cover.jpg") {
 				NewResp(w, fp(v))
 				return
 			}

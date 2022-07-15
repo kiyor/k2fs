@@ -658,6 +658,12 @@ func serveFile(w http.ResponseWriter, r *http.Request, fs FileSystem, name strin
 							}
 						}
 					} else {
+						r, _ := fs.Open(name)
+						defer r.Close()
+						dst, _ := os.Create(fn)
+						io.Copy(dst, r)
+						dst.Close()
+						f, _ = os.Open(fn)
 						goto GOT
 					}
 				}

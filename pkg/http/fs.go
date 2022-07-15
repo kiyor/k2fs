@@ -659,6 +659,8 @@ func serveFile(w http.ResponseWriter, r *http.Request, fs FileSystem, name strin
 						} else {
 							log.Println(err)
 						}
+					} else {
+						f = reader
 					}
 				}
 			} else {

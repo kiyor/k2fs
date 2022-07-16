@@ -1,4 +1,4 @@
-var _pathname = window.location.pathname; // Returns path only (/path/example.html)
+var _pathname = decodeURI(window.location.pathname); // Returns path only (/path/example.html)
 var _url = window.location.href; // Returns full URL (https://example.com/path/example.html)
 var _origin = window.location.origin; // Returns base URL (https://example.com)
 
@@ -383,7 +383,7 @@ const myapp = {
       }
       console.log(this.thumbHistory.length);
       var data = {};
-      data.path = decodeURI(this.path);
+      data.path = this.path;
       data.name = file.Name;
       if (this.thumbCache.has(file.Hash)) {
         console.log("HIT " + file.Hash);

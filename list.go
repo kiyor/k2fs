@@ -191,6 +191,9 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 		m["listdir"] = "read"
 	}
 	path := filepath.Join(rootDir, m["path"])
+	if strings.Contains(path, "%") {
+		path, _ = url.PathUnescape(path)
+	}
 	f, err := os.Stat(path)
 	if err != nil {
 		log.Println(err)

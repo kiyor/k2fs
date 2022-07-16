@@ -222,11 +222,13 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 			fs, err = filePathWalkDir(path)
 		}
 		if err != nil {
+			log.Println(err)
 			NewErrResp(w, 1, err)
 			return
 		}
 		list, err = slice2fileinfo(fs, path)
 		if err != nil {
+			log.Println(err)
 			NewErrResp(w, 1, err)
 			return
 		}

@@ -114,12 +114,16 @@ func apiThumb(w http.ResponseWriter, r *http.Request) {
 		NewErrResp(w, 1, err)
 		return
 	}
-	m["path"] = strings.TrimRight(m["path"], "/")
-	if len(m["path"]) == 0 {
-		m["path"] = "/"
+	path := m["path"]
+	if strings.Contains(path, "%") {
+		path, _ = url.PathUnescape(path)
+	}
+	path = strings.TrimRight(path, "/")
+	if len(path) == 0 {
+		path = "/"
 	}
 	m["name"] = strings.TrimRight(m["name"], "/")
-	abs := filepath.Join(rootDir, m["path"], m["name"])
+	abs := filepath.Join(rootDir, path, m["name"])
 
 	f, err := os.Stat(abs)
 	if err != nil {

@@ -383,7 +383,7 @@ const myapp = {
       }
       console.log(this.thumbHistory.length);
       var data = {};
-      data.path = this.path;
+      data.path = decodeURI(this.path);
       data.name = file.Name;
       if (this.thumbCache.has(file.Hash)) {
         console.log("HIT " + file.Hash);

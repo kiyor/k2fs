@@ -187,24 +187,22 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// 	path := "." + q.Get("path")
-	m["path"] = strings.TrimRight(m["path"], "/")
-	if len(m["path"]) == 0 {
-		m["path"] = "/"
+	path := m["path"]
+	if strings.Contains(path, "%") {
+		path, _ = url.PathUnescape(path)
+	}
+	path = strings.TrimRight(path, "/")
+	if len(path) == 0 {
+		path = "/"
 	}
 	if _, ok := m["listdir"]; !ok {
 		m["listdir"] = "read"
 	}
-	path := filepath.Join(rootDir, m["path"])
-	f, err := os.Stat(path)
+	abs := filepath.Join(rootDir, path)
+	f, err := os.Stat(abs)
 	if err != nil {
-		log.Println(err)
-		path, _ = url.PathUnescape(path)
-		f, err = os.Stat(path)
-		if err != nil {
-			log.Println(err)
-			NewErrResp(w, 1, err)
-			return
-		}
+		NewErrResp(w, 1, err)
+		return
 	}
 	var isRead, isFind bool
 	switch m["listdir"] {

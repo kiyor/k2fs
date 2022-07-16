@@ -418,7 +418,7 @@ const myapp = {
     },
     async listApi(path) {
       var data = {};
-      data.path = decodeURI(this.path);
+      data.path = this.path;
       data.list = "read";
       await axios.post("/api?action=list", data)
         .then(response => {
@@ -443,7 +443,7 @@ const myapp = {
     },
     async listSubApi(path) {
       var data = {};
-      data.path = decodeURI(this.path);
+      data.path = this.path;
       data.listdir = "find";
       await axios.post("/api?action=list", data)
         .then(response => {

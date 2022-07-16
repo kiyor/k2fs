@@ -191,14 +191,16 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 		m["listdir"] = "read"
 	}
 	path := filepath.Join(rootDir, m["path"])
-	if strings.Contains(path, "%") {
-		path, _ = url.PathUnescape(path)
-	}
 	f, err := os.Stat(path)
 	if err != nil {
 		log.Println(err)
-		NewErrResp(w, 1, err)
-		return
+		path, _ = url.PathUnescape(path)
+		f, err = os.Stat(path)
+		if err != nil {
+			log.Println(err)
+			NewErrResp(w, 1, err)
+			return
+		}
 	}
 	var isRead, isFind bool
 	switch m["listdir"] {
@@ -227,7 +229,7 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		dir := NewDir()
-		dir.Dir = m["path"]
+		dir.Dir = path
 		dir.Hash = hash(path)
 		dir.UpDir = upDir(dir.Dir)
 
@@ -256,7 +258,7 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 			if m, ok := meta.Get(nf.Name); ok {
 				nf.Meta = m
 			}
-			fp := filepath.Join("/statics", m["path"], p)
+			fp := filepath.Join("/statics", path, p)
 			if isMac(r) && isVideo(nf.Name) {
 				host := "http://" + r.Host
 				if len(flagHost) > 0 {

@@ -128,10 +128,10 @@
                     <i v-bind:class="icon"></i>
                   </span>
                   <span v-if="file.IsDir" @click="clickSubDir(path,file)"><i class="far fa-folder-open"></i></span>
-                  <span v-if="file.IsDir" @click.prevent="onClick(path,file)"> {{file.Name}}</span> <span v-for="tag in file.Meta.Tags">{{tag}},</span>
+                  <span v-if="file.IsDir" @click.prevent="onClick(path,file)"> {{file.Name}}</span> <span v-for="tag in file.Meta.Tags"><button type="button" class="btn btn-info btn-sm">{{tag}}</button>,</span>
                   <i v-if="!file.IsDir" class="far fa-file"></i>
                   <a v-if="!file.IsDir" @click="clickFile(file)" :href="file.ShortCut" target="_blank">
-                    {{file.Name}}</a> <span v-for="tag in file.Meta.Tags">{{tag}},</span>
+                    {{file.Name}}</a> <span v-for="tag in file.Meta.Tags"><button type="button" class="btn btn-info btn-sm">{{tag}}</button>,</span>
                   <ul v-if="isOpened(path,file)">
                     <li class="sm" v-for="sub in subList[getSub(path,file.Name)]">
                       <a target="_blank" :href="getSubLink(path,file,sub)">{{sub.Name}}</a>

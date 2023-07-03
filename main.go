@@ -3,11 +3,11 @@ package main
 import (
 	_ "embed"
 	"flag"
-	"io"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"text/template"
 
@@ -29,6 +29,12 @@ var (
 
 	//go:embed app.js
 	appjs string
+	//go:embed bootstrap.css
+	bootstrapcss string
+
+	redisHost string
+
+	metaHost string
 
 	flagDf flagSliceString
 )
@@ -42,16 +48,18 @@ func init() {
 	flag.StringVar(&intf, "i", "0.0.0.0", "http service interface address")
 	flag.StringVar(&port, "l", ":8080", "http service listen port")
 	flag.StringVar(&rootDir, "root", ".", "root dir")
+	flag.StringVar(&redisHost, "redis", "192.168.10.10", "redis host")
 	flag.StringVar(&flagHost, "host", "", "host if need overwrite; syntax like http://a.com(:8080)")
+	flag.StringVar(&metaHost, "meta", "192.168.10.31:9000", "meta host")
 	flag.Var(&flagDf, "df", "monitor mount dir")
 }
 
-func universal(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path == "/favicon.ico" {
-		w.WriteHeader(200)
-		return
-	}
-	w.Header().Add("content-type", "text/html")
+var (
+	reIpad  = regexp.MustCompile(` Version/\d+\.\d+`)
+	rePhone = regexp.MustCompile(`(P|p)hone`)
+)
+
+func req2map(r *http.Request) map[string]interface{} {
 	scheme := "http"
 	if r.TLS != nil {
 		scheme = "https"
@@ -62,19 +70,25 @@ func universal(w http.ResponseWriter, r *http.Request) {
 		u = flagHost
 	}
 	m["host"] = u
-	// 	usage := DiskSize([]string(flagDf))
-	// 	m["usage"] = usage
+	m["ios"] = reIpad.MatchString(r.Header.Get("User-Agent"))
+	m["phone"] = rePhone.MatchString(r.Header.Get("User-Agent"))
+	// 	log.Println("ios:", m["ios"])
+	return m
+}
+
+func universal(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/favicon.ico" {
+		w.WriteHeader(200)
+		return
+	}
+	w.Header().Add("content-type", "text/html")
 	var t *template.Template
-	// 	if _, err := os.Stat("tmpl.html"); err == nil {
-	// 		t, _ = template.New("").Delims("[[", "]]").ParseFiles("tmpl.html")
-	// 	} else {
 	t, _ = template.New("").Delims("[[", "]]").Funcs(
 		template.FuncMap{
 			"slice": genSlice,
 		},
 	).Parse(basicView)
-	// 	}
-	t.Execute(w, m)
+	t.Execute(w, req2map(r))
 }
 
 func genSlice(i ...interface{}) chan interface{} {
@@ -90,10 +104,11 @@ func genSlice(i ...interface{}) chan interface{} {
 
 func main() {
 	flag.Parse()
+	InitRedisPool()
 	if rootDir == "." {
 		rootDir, _ = os.Getwd()
 	}
-	cache = gcache.New(cacheMax).LRU().Expiration(cacheTimeout).Build()
+	cache = gcache.New(cacheMax).LRU().Build()
 	addr = intf + port
 	Trash = filepath.Join(rootDir, ".Trash")
 	if _, err := os.Stat(Trash); err != nil {
@@ -105,12 +120,18 @@ func main() {
 	r := mux.NewRouter()
 	r.Path("/app.js").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("content-type", "application/javascript")
-		f, err := os.Open("app.js")
-		if err != nil {
-			w.Write([]byte(appjs))
-		} else {
-			io.Copy(w, f)
-		}
+		w.Header().Add("cache-control", "public, max-age=300")
+		t, _ := template.New("app.js").Delims("[[", "]]").Funcs(
+			template.FuncMap{
+				"slice": genSlice,
+			},
+		).Parse(appjs)
+		t.Execute(w, req2map(r))
+	})
+	r.Path("/bootstrap.css").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("content-type", "text/css")
+		w.Header().Add("cache-control", "public, max-age=300")
+		w.Write([]byte(bootstrapcss))
 	})
 	fileServer := myhttp.FileServer(myhttp.Dir(rootDir))
 	r.PathPrefix("/api").HandlerFunc(api)

@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
+	golib "github.com/kiyor/golib"
 	kfs "github.com/kiyor/k2fs/lib"
 )
 
@@ -34,6 +36,26 @@ func NewResp(w http.ResponseWriter, data interface{}, code ...int) []byte {
 	}
 	w.Header().Add("content-type", "application/json")
 	w.Write(b)
+	return b
+}
+
+func NewCacheResp(w http.ResponseWriter, data interface{}, cacheKey string, expire time.Duration, code ...int) []byte {
+	c := 0
+	if len(code) > 0 {
+		c = code[0]
+	}
+	r := &Resp{
+		Code: c,
+		Data: data,
+	}
+	// 	b, err := json.MarshalIndent(r, "", "  ")
+	b, err := json.Marshal(r)
+	if err != nil {
+		log.Println(err)
+	}
+	w.Header().Add("content-type", "application/json")
+	w.Write(b)
+	cache.SetWithExpire(cacheKey, b, expire)
 	return b
 }
 
@@ -66,6 +88,10 @@ type File struct {
 	ModTimeH string
 
 	ShortCut string
+
+	ThumbLink   string
+	Description string
+	Tags        []string
 
 	Meta kfs.MetaInfo
 }
@@ -110,24 +136,42 @@ func apiDf(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(toJSON(du)))
 }
 
+var sizeManager = golib.NewManager(runtime.NumCPU(), 100000)
+var sizeTasks = make(chan golib.Task)
+
+func init() {
+	sizeManager.Start(sizeTasks)
+}
+
 func dirSize(path string) (int64, error) {
 	key := "size:" + path
 	if val, err := cache.Get(key); err == nil {
 		return val.(int64), nil
 	}
-
-	var size int64
-	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
-		if err != nil {
+	sizeTasks <- golib.NewTask(
+		func() error {
+			if _, err := cache.Get(key); err == nil {
+				return nil
+			}
+			var size int64
+			err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+				if err != nil {
+					return err
+				}
+				if !info.IsDir() {
+					size += info.Size()
+				}
+				return err
+			})
+			if err == nil {
+				cache.SetWithExpire(key, size, cacheTimeout)
+			}
 			return err
-		}
-		if !info.IsDir() {
-			size += info.Size()
-		}
-		return err
-	})
-	cache.Set(key, size)
-	return size, err
+		},
+		nil,
+		false,
+	)
+	return 1, nil
 }
 
 func prettyTime(t time.Time) string {

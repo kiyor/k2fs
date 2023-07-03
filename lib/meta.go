@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
+	"os"
 	"path/filepath"
 	"sort"
 	"sync"
@@ -33,6 +34,8 @@ type Meta struct {
 	mu       *sync.Mutex
 }
 
+type DefaultMeta *Meta
+
 func NewMeta(path string) *Meta {
 	m := Meta{
 		MetaInfo: make(map[string]MetaInfo),
@@ -48,7 +51,7 @@ func NewMeta(path string) *Meta {
 func (m *Meta) init(path string) {
 	m.Root = path
 	b, _ := json.MarshalIndent(m, "", "  ")
-	ioutil.WriteFile(filepath.Join(m.Root, KFS), b, 0644)
+	os.WriteFile(filepath.Join(m.Root, KFS), b, 0644)
 }
 
 func (m *Meta) Load(path string) error {
@@ -139,7 +142,7 @@ func (m *Meta) Write() error {
 		log.Println(err.Error())
 		return err
 	}
-	return ioutil.WriteFile(metaFile, b, 0644)
+	return os.WriteFile(metaFile, b, 0644)
 }
 
 type MetaInfo struct {

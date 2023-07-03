@@ -56,8 +56,33 @@ var _getQS = function(param) {
   return res;
 }
 
+var _setQS = function(param, paramVal) {
+  var newAdditionalURL = "";
+  var tempArray = window.location.toString().split("?");
+//   var baseURL = tempArray[0]; 
+  var additionalURL = tempArray[1];
+  var temp = "";
+  if (additionalURL) {
+    tempArray = additionalURL.split("&");
+    console.log(tempArray, tempArray.length);
+    for (var i = 0; i < tempArray.length; i++) {
+      console.log(tempArray[i].split('=')[0]);
+      if (tempArray[i].split('=')[0] != param) {
+        console.log(tempArray[i].split('=')[0], tempArray[i].split('=')[1]);
+        newAdditionalURL += temp + tempArray[i];
+        temp = "&";
+        console.log(temp);
+      }
+    }
+  }
+
+  var rows_txt = temp + "" + param + "=" + paramVal;
+  console.log("?" + newAdditionalURL + rows_txt);
+  window.history.replaceState('', '', "?" + newAdditionalURL + rows_txt);
+}
+
 var _scale_width = "640";
-var _show_width = 800;
+var _show_width = 400;
 
 String.prototype.trimRight = function(charlist) {
   if (charlist === undefined)
@@ -73,7 +98,7 @@ window.onload = function() {
 const myapp = {
   data() {
     return {
-      class_container: "container-lg",
+      class_container: "container-xxl",
       path: _pathname,
       dir: "",
       df: [],
@@ -90,12 +115,14 @@ const myapp = {
       desc: "1",
       clickCounter: 0,
       clickTimer: null,
+      search: "",
+      isShowing: "",
       history: [],
     }
   },
   async mounted() {
     this.getDf();
-    await this.listApi(this.path);
+    await this.listApi();
     var p = this.path.trimRight("/").split("/")
     for (let k in p) {
       if (k > 0) {
@@ -112,6 +139,11 @@ const myapp = {
           break;
         }
       }
+    }
+    var search = _getQS('search');
+    if (search != undefined) {
+      this.search = search;
+      this.listApi();
     }
     //     console.log(this.history); 
   },
@@ -135,8 +167,14 @@ const myapp = {
         this.clickCounter = 0;
       }
     },
+    changeSearch() {
+      console.log(this.search);
+      _setQS("search",this.search);
+      this.listApi();
+    },
     async clickDir(path, file) {
-      var sub = this.getSub(path, file.Name);
+      this.hideAllPic();
+      var sub = file.Path;
       var p = sub.split("/")
       for (let k in p) {
         if (k > 0) {
@@ -145,9 +183,11 @@ const myapp = {
       }
       //       console.log(this.history); 
       this.path = sub;
-      console.log(1);
-      await this.listApi(this.path);
-      var nextURL = _host + this.path;
+      console.log(this.path);
+      console.log(path);
+      await this.listApi();
+      var nextURL = _host + "/" + this.path;
+      console.log(nextURL);
       var nextTitle = '';
       var nextState = {
         additionalInformation: ''
@@ -163,10 +203,10 @@ const myapp = {
       if (!file.IsDir) {
         return false;
       }
-      if (this.subListOpen[this.getSub(path, file.Name)] === undefined) {
-        this.subListOpen[this.getSub(path, file.Name)] = false;
+      if (this.subListOpen[file.Path] === undefined) {
+        this.subListOpen[path, file.Path] = false;
       }
-      return this.subListOpen[this.getSub(path, file.Name)];
+      return this.subListOpen[path, file.Path];
     },
     trimRight(a, b) {
       return a.trimRight(b);
@@ -207,16 +247,13 @@ const myapp = {
     getLink(path, file) {
       return '/statics' + path + '/' + file.Name;
     },
-    getSub(path, file) {
-      file = file.trimRight("/");
-      path = path.trimRight("/");
-      return path + "/" + file;
-    },
     clickSubDir(path, file) {
+      console.log(path);
+      console.dir(file);
       if (!file.IsDir) {
         return
       }
-      var sub = this.getSub(path, file.Name);
+      var sub = file.Path;
       if (this.subListOpen[sub] === undefined) {
         this.subListOpen[sub] = true;
       } else {
@@ -249,10 +286,11 @@ const myapp = {
       console.log("colorCleaner finished")
     },
     async clickUpDir() {
+      this.hideAllPic();
       this.path = this.resp.UpDir;
-      console.log(1);
-      await this.listApi(this.path);
-      var nextURL = _host + this.path;
+      console.log(this.path);
+      await this.listApi();
+      var nextURL = _host + "/" + this.path;
       var nextTitle = '';
       var nextState = {
         additionalInformation: ''
@@ -283,7 +321,7 @@ const myapp = {
         .then(response => {
           console.log(response.data);
           this.select = {};
-          this.listApi(this.path);
+          this.listApi();
           this.getDf();
           _hide();
         })
@@ -292,6 +330,23 @@ const myapp = {
         })
     },
     loadPic(pic, file) {
+//       let thsize = document.getElementById('thsize'); 
+//       let rect = thsize.getBoundingClientRect(); 
+      let thname = document.getElementById("thname").getBoundingClientRect().left;
+      let thsize = document.getElementById("thsize").getBoundingClientRect().left;
+      let thlastmod = document.getElementById("thlastmod").getBoundingClientRect().right;
+      let leftPos = thsize - thname;
+      //_show_width = thlastmod - thsize;
+      
+      _show_width = window.innerWidth - thsize;
+      if ( _show_width > 30 ) {
+        _show_width = _show_width - 30;
+      }
+//       let thumb = document.getElementsByClassName("thumb"); 
+//       for (let i = 0; i < thumb.length; i ++) { 
+//         thumb[i].style.left = leftPos.toString() + "px"; 
+//       } 
+
       this.thumbHistory.push("img_" + file.Hash);
       let path = this.path.trimRight("/");
       path = path.trimLeft("/");
@@ -304,12 +359,14 @@ const myapp = {
       let a = document.createElement("div");
       a.setAttribute("class", "thumb");
       a.setAttribute("id","img_" + file.Hash);
+      a.style.left = leftPos.toString() + "px";
       let img = document.createElement("img");
       img.src = pic.Path + '?max-width=' + _scale_width;
       img.setAttribute("class", "thumbimg");
 
-      let imgPath = encodeURI(_host + '/photo/' + path + "/" + file.Name);
-      console.log(imgPath);
+//       let imgPath = encodeURI(_host + '/photo/' + path + "/" + file.Name); 
+      let imgPath = encodeURI(_host + '/photo/' + file.Path);
+//       console.log(imgPath); 
 
       a.onclick = function() {
         window.open(
@@ -318,75 +375,53 @@ const myapp = {
         );
       }
 
-      if (pic.Height > screen.height) {
+      if (pic.Width > _show_width) {
+        img.width = _show_width;
+      } else {
+        img.width = pic.Width;
+      }
+      let zoom = img.width / pic.Width; // like 0.5
+      img.height = pic.Height * zoom;
+
+      if (img.height > screen.height) {
         console.log("case 1 " + pic.Height);
-        if (pic.Width > _show_width) {
-          img.width = _show_width;
-        } else {
-          img.width = pic.Width;
-        }
-        let zoom = img.width / pic.Width; // like 0.5
-        img.height = pic.Height * zoom;
         if (img.height > topPos) {
           a.style.top = "-" + topPos.toString() + "px"; // from top of screen
         } else {
           let x = bottomPos - img.height - topPos;
           a.style.top = x.toString() + "px";
         }
-        /*
-        if (pic.Height > 4 * screen.height) {
-          img.width = 1200;
-        } else if (pic.Height > 2 * screen.height) {
-          img.height = 2*screen.height;
-        } else {
-          img.height = pic.Height;
-        }
-        */
-        //a.style.top = "-" + topPos.toString() + "px"; // from top of screen
-//         console.log("-" + topPos.toString() + "px"); 
-      } else if (pic.Height > topPos) {
+      } else if (img.height > topPos) {
         console.log("case 2");
-//         console.log(pic.Height); 
-//         console.log(topPos); 
-//         console.log(bottomPos); 
-        img.width = pic.Width;
         a.style.top = "-" + topPos.toString() + "px";
-//         console.log("-" + topPos.toString() + "px"); 
       } else {
         console.log("case 3");
-        img.width = pic.Width;
-//         console.log(pic.Height); 
-//         console.log(topPos); 
-//         console.log(bottomPos); 
-//         console.log(screen.height); 
-        let x = bottomPos - pic.Height - topPos;
-//         topPos = topPos - pic.Height/2 
+        let x = bottomPos - img.height - topPos;
         a.style.top = x.toString() + "px";
-//         console.log(x.toString() + "px"); 
       }
       
       a.appendChild(img);
       cur.appendChild(a);
     },
-    async showPic(file) {
-      if (this.thumbHistory.length > 0) {
-        for (let i = 0; i < this.thumbHistory.length; i++) {
-          let div = document.getElementById(this.thumbHistory[i]);
-          if (div !== null) {
-            div.remove();
-          }
-        }
-        this.thumbHistory = [];
+    autoPic(file) {
+      if (this.isShowing == file.Path) {
+        this.hidePic(file);
+        this.isShowing = "";
+      } else {
+        this.showPic(file);
+        this.isShowing = file.Path;
       }
+    },
+    async showPic(file) {
+      this.hideAllPic();
       if (!file.IsDir) {
         return
       }
-      console.log(this.thumbHistory.length);
+//       console.log(this.thumbHistory.length); 
       var data = {};
-      data.path = this.path;
-      data.name = file.Name;
+      data.path = file.Path;
       if (this.thumbCache.has(file.Hash)) {
-        console.log("HIT " + file.Hash);
+//         console.log("HIT " + file.Hash); 
         this.loadPic(this.thumbCache.get(file.Hash), file);
         return
       }
@@ -395,7 +430,7 @@ const myapp = {
           if (response.data.Data !== "") {
             let pic = response.data.Data;
             this.thumbCache.set(file.Hash,pic);
-            console.log("MISS " + file.Hash);
+//             console.log("MISS " + file.Hash); 
             this.loadPic(pic, file);
           }
         })
@@ -416,10 +451,22 @@ const myapp = {
 //         this.thumbHistory.pop(); 
       }
     },
-    async listApi(path) {
+    hideAllPic() {
+      if (this.thumbHistory.length > 0) {
+        for (let i = 0; i < this.thumbHistory.length; i++) {
+          let div = document.getElementById(this.thumbHistory[i]);
+          if (div !== null) {
+            div.remove();
+          }
+        }
+        this.thumbHistory = [];
+      }
+    },
+    async listApi() {
       var data = {};
       data.path = this.path;
       data.list = "read";
+      data.search = this.search;
       await axios.post("/api?action=list", data)
         .then(response => {
           this.resp = response.data.Data;
@@ -443,7 +490,7 @@ const myapp = {
     },
     async listSubApi(path) {
       var data = {};
-      data.path = this.path;
+      data.path = path;
       data.listdir = "find";
       await axios.post("/api?action=list", data)
         .then(response => {
@@ -466,7 +513,7 @@ const myapp = {
       }
       axios.get("/api?action=session&sortby=" + thing + "&desc=" + this.desc)
         .then(response => {
-          this.listApi(this.path);
+          this.listApi();
           console.log(response.data);
         })
         .catch(error => {

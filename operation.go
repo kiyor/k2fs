@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	kfs "github.com/kiyor/k2fs/lib"
 )
@@ -22,8 +23,11 @@ type Operation struct {
 }
 
 var Trash string
+var opMutex *sync.Mutex = new(sync.Mutex)
 
 func apiOperation(w http.ResponseWriter, r *http.Request) {
+	opMutex.Lock()
+	defer opMutex.Unlock()
 	defer r.Body.Close()
 	var op Operation
 	err := json.NewDecoder(r.Body).Decode(&op)
@@ -118,13 +122,21 @@ func apiOperation(w http.ResponseWriter, r *http.Request) {
 					meta.Del(k)
 					m.OldLoc = file
 					trashMeta.Set(k, m)
-					trashMeta.Write()
+					err := trashMeta.Write()
+					if err != nil {
+						log.Println(err)
+					}
 				}
 				cache.Remove("size:" + Trash)
 			}
 		}
 	}
-	meta.Write()
+	err = meta.Write()
+	if err != nil {
+		log.Println(err)
+		NewResp(w, err, 1)
+		return
+	}
 	NewResp(w, "success")
 	// 	log.Println(toJSON(meta))
 }

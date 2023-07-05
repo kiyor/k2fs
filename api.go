@@ -84,6 +84,7 @@ type File struct {
 	Size     int64
 	SizeH    string
 	IsDir    bool
+	IsImage  bool
 	ModTime  time.Time
 	ModTimeH string
 

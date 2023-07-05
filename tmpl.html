@@ -153,7 +153,7 @@
                     {{file.Name}} <span v-for="tag in file.Meta.Tags"><button type="button" class="btn btn-info btn-sm tag" @click="search=tag;changeSearch()">{{tag}}</button></span></a>
                   <ul v-if="isOpened(path,file)">
                     <li class="sm" v-for="sub in subList[file.Path]">
-                      <a :href="getSubLink(path,file,sub)">{{sub.Name}}</a>
+                      <a :href="getSubLink(path,file,sub)"><span @mouseover="singlePic(path,file,sub)" @mouseleave="">{{sub.Name}}</span></a>
                     </li>
                   </ul>
                 </td>

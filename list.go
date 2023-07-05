@@ -206,6 +206,18 @@ func apiThumb(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+var imageExt = []string{".JPG", ".JPEG", ".PNG", ".GIF", ".BMP"}
+
+func isImage(path string) bool {
+	ext := strings.ToUpper(filepath.Ext(path))
+	for _, v := range imageExt {
+		if ext == v {
+			return true
+		}
+	}
+	return false
+}
+
 func apiList(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	m := make(map[string]string)
@@ -299,6 +311,8 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 			nf.IsDir = f.IsDir()
 			if nf.IsDir {
 				nf.Name += "/"
+			} else {
+				nf.IsImage = isImage(nf.Path)
 			}
 			d, _ := filepath.Split(nf.Path)
 			meta := kfs.NewMeta(filepath.Join(rootDir, d))

@@ -92,7 +92,7 @@ String.prototype.trimRight = function(charlist) {
 };
 
 window.onload = function() {
-  document.getElementsByClassName("blink_me").fadeOut(3000).fadeIn(3000, blink);
+  document.getElementsByClassName("blink_me").fadeIn(3000, blink);
 }
 
 const myapp = {
@@ -329,6 +329,24 @@ const myapp = {
           console.log(error)
         })
     },
+    easyLoadPic(link, file) {
+      let thname = document.getElementById("thname").getBoundingClientRect().left;
+      let thsize = document.getElementById("thsize").getBoundingClientRect().left;
+      let leftPos = thsize - thname;
+      let cur = document.getElementById(file.Hash);
+      let rect = cur.getBoundingClientRect();
+      let topPos = rect.top;
+      let a = document.createElement("div");
+      a.setAttribute("class", "thumb");
+      a.style.left = leftPos.toString() + "px";
+      let img = document.createElement("img");
+      img.src = link;
+      img.setAttribute("class", "thumbimg");
+      img.width = _show_width;
+      a.style.top = "-" + topPos.toString() + "px";
+      a.appendChild(img);
+      cur.appendChild(a);
+    },
     loadPic(pic, file) {
 //       let thsize = document.getElementById('thsize'); 
 //       let rect = thsize.getBoundingClientRect(); 
@@ -361,11 +379,20 @@ const myapp = {
       a.setAttribute("id","img_" + file.Hash);
       a.style.left = leftPos.toString() + "px";
       let img = document.createElement("img");
-      img.src = pic.Path + '?max-width=' + _scale_width;
+      if (file.IsImage) {
+        img.src = '/statics/' + pic.Path;
+      } else {
+        img.src = pic.Path + '?max-width=' + _scale_width;
+      }
       img.setAttribute("class", "thumbimg");
 
 //       let imgPath = encodeURI(_host + '/photo/' + path + "/" + file.Name); 
-      let imgPath = encodeURI(_host + '/photo/' + file.Path);
+      let imgPath = ""
+      if (file.IsImage) {
+        imgPath = encodeURI(_host + '/statics/' + file.Path);
+      } else {
+        imgPath = encodeURI(_host + '/photo/' + file.Path);
+      }
 //       console.log(imgPath); 
 
       a.onclick = function() {
@@ -374,6 +401,14 @@ const myapp = {
           '_blank' // <- This is what makes it open in a new window.
         );
       }
+      if (file.IsImage) {
+        img.width = _show_width;
+        a.style.top = "-" + topPos.toString() + "px";
+        a.appendChild(img);
+        cur.appendChild(a);
+        return
+      }
+      
 
       if (pic.Width > _show_width) {
         img.width = _show_width;
@@ -399,6 +434,11 @@ const myapp = {
         let x = bottomPos - img.height - topPos;
         a.style.top = x.toString() + "px";
       }
+      if (file.IsImage) {
+        a.style.top = "0px";
+        img.height = "auto";
+        img.width = "auto";
+      }
       
       a.appendChild(img);
       cur.appendChild(a);
@@ -412,8 +452,20 @@ const myapp = {
         this.isShowing = file.Path;
       }
     },
+    singlePic(path, file, sub) {
+      if (!file.IsImage) {
+        return
+      }
+      console.log("singlePic",path,file,sub);
+      let link = '/statics' + path.trimRight('/') + '/' + file.Name + sub.Path;
+      this.easyLoadPic(link, file);
+    },
     async showPic(file) {
       this.hideAllPic();
+      if (file.IsImage) {
+        this.loadPic(file, file);
+        return
+      }
       if (!file.IsDir) {
         return
       }

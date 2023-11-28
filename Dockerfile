@@ -10,7 +10,7 @@ COPY *.go ./
 COPY *.html ./
 COPY *.js ./
 COPY *.css ./
-RUN CGO_ENABLED=0 GOOS=linux go build -mod vendor -a -installsuffix cgo -o k2fs .
+RUN go build -mod vendor -a -installsuffix cgo -o k2fs .
 
 #FROM alpine:3.3
 #RUN apk update && apk add ca-certificates su-exec unzip unrar tzdata && rm -rf /var/cache/apk/*
@@ -35,5 +35,6 @@ ENV LC_ALL en_US.UTF-8
 WORKDIR /bin
 COPY --from=builder /go/src/k2fs/k2fs .
 COPY conv .
+COPY local local
 EXPOSE 8080
 CMD ["./k2fs"]

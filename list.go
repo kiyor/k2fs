@@ -8,6 +8,7 @@ import (
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -15,12 +16,15 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/dustin/go-humanize"
+	retryablehttp "github.com/hashicorp/go-retryablehttp"
 	"github.com/kiyor/golib"
+	"github.com/kiyor/k2fs/lib"
 	kfs "github.com/kiyor/k2fs/lib"
 )
 
@@ -221,9 +225,16 @@ func isImage(path string) bool {
 func apiList(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	m := make(map[string]string)
-	err := json.NewDecoder(r.Body).Decode(&m)
+	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Println(err)
+		NewErrResp(w, 1, err)
+		return
+	}
+	// log.Println(string(b))
+	err = json.Unmarshal(b, &m)
+	if err != nil {
+		log.Println(string(b), err)
 		NewErrResp(w, 1, err)
 		return
 	}
@@ -258,7 +269,10 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 		isRead = false
 		isSearch = true
 	}
-	session, _ := store.Get(r, APP)
+	session, err := store.Get(r, APP)
+	if err != nil {
+		log.Println(err)
+	}
 	if f.IsDir() {
 		var fs []string
 		var list map[string]os.FileInfo
@@ -322,11 +336,11 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 			// 			fp := filepath.Join("/statics", path, f.Name())
 			fp := filepath.Join("/statics", p)
 			replacer := strings.NewReplacer("+", "%20", "#", "%23")
+			host := "http://" + r.Host
+			if len(flagHost) > 0 {
+				host = flagHost
+			}
 			if isVideo(nf.Name) {
-				host := "http://" + r.Host
-				if len(flagHost) > 0 {
-					host = flagHost
-				}
 				qv := url.Values{}
 				qv["url"] = []string{host + fp}
 				q := replacer.Replace(qv.Encode())
@@ -338,54 +352,27 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 				case isWin(r):
 					nf.ShortCut = host + replacer.Replace(fp)
 				default:
-					nf.ShortCut = replacer.Replace(fp)
+					nf.ShortCut = host + replacer.Replace(fp)
 				}
 			} else {
-				nf.ShortCut = replacer.Replace(fp)
+				nf.ShortCut = host + replacer.Replace(fp)
 			}
-			/*
-				if isMac(r) && isVideo(nf.Name) {
-					host := "http://" + r.Host
-					if len(flagHost) > 0 {
-						host = flagHost
-					}
-					qv := url.Values{}
-					qv["url"] = []string{host + fp}
-					replacer := strings.NewReplacer("+", "%20", "#", "%23")
-					q := replacer.Replace(qv.Encode())
-					nf.ShortCut = "iina://open?" + q
-				} else if isWin(r) && isVideo(nf.Name) {
-					// 				host := "vlc://" + r.Host
-					host := "http://" + r.Host
-					if len(flagHost) > 0 {
-						host = flagHost
-					}
-					replacer := strings.NewReplacer("#", "%23")
-					nf.ShortCut = host + replacer.Replace(fp)
-					log.Println(nf.ShortCut)
-				} else if isPhone(r) && isVideo(nf.Name) {
-					host := "http://" + r.Host
-					if len(flagHost) > 0 {
-						host = flagHost
-					}
-					qv := url.Values{}
-					qv["url"] = []string{host + fp}
-					replacer := strings.NewReplacer("+", "%20") //, "#", "%23")
-					q := replacer.Replace(qv.Encode())
-					nf.ShortCut = "vlc-x-callback://x-callback-url/stream?" + q
-					log.Println(nf.ShortCut)
-				} else {
-					replacer := strings.NewReplacer("#", "%23")
-					nf.ShortCut = replacer.Replace(fp)
-				}
-			*/
+			// log.Println(nf.ShortCut)
+			// 					nf.ShortCut = "vlc-x-callback://x-callback-url/stream?" + q
 			if isSearch {
+				match := func(name string) bool {
+					if strings.HasPrefix(filter, "!") {
+						return !strings.Contains(nf.Name, filter[1:])
+					} else {
+						return strings.Contains(name, filter)
+					}
+				}
 				if nf.IsDir {
-					if strings.Contains(nf.Name, filter) {
+					if match(nf.Name) {
 						dir.Files = append(dir.Files, nf)
 					} else {
 						for _, v := range nf.Meta.Tags {
-							if strings.Contains(v, filter) {
+							if match(v) {
 								dir.Files = append(dir.Files, nf)
 								break
 							}
@@ -397,6 +384,9 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		desc := true
+		if m["desc"] != "" {
+			session.Values["desc"] = []string{m["desc"]}
+		}
 		if des, ok := session.Values["desc"]; ok {
 			d := des.([]string)
 			switch d[0] {
@@ -408,8 +398,12 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 				log.Println(d)
 			}
 		}
+		if m["sortby"] != "" {
+			session.Values["sortby"] = []string{m["sortby"]}
+		}
 		if sortby, ok := session.Values["sortby"]; ok {
 			s := sortby.([]string)
+			// log.Println("sortby", s[0], "desc", desc)
 			switch s[0] {
 			case "name":
 				sort.Slice(dir.Files, func(i, j int) bool {
@@ -446,26 +440,75 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 		// query thumb start
-		client := &http.Client{
-			Timeout: 2 * time.Second,
-		}
+		client := retryablehttp.NewClient()
+		client.HTTPClient.Timeout = 2 * time.Second
+		// 		client := &http.Client{
+		// 			Timeout: 2 * time.Second,
+		// 		}
 
 		var tasks []golib.Task
+		var cdn bool
+
+		// 		if !isPhone(r) {
+		cdn = true
+		// 		}
 
 		for _, _v := range dir.Files {
 			v := _v
 			fc := func() error {
 				name := strings.TrimRight(v.Name, "/")
 				name = filepath.Base(name)
+				found := false
 				if name, b := isAV(name); b {
 					key := "AV:" + name
+					if cdn {
+						key += ":cdn"
+					}
 					var jr JavResp
-					if b := Redis.GetValue(key, &jr); b {
-						v.Description = jr.Data.Title
+					if b := lib.Redis.GetValue(key, &jr); b {
+						if jr.Data.UserData.Like {
+							v.Description += `♥️`
+						}
+						if jr.Data.UserData.Score == 5 {
+							v.Description += `🔥`
+						}
+						for i := 0; i < jr.Data.UserData.FavourCount; i++ {
+							v.Description += `👍`
+						}
+						v.Description += jr.Data.Title
 						v.ThumbLink = jr.Data.BackupCover
-						v.Tags = jr.Data.Tags
+						// tags
+						m := make(map[string]bool)
+						for _, t := range jr.Data.Tags {
+							m[t] = true
+						}
+						for _, g := range jr.Data.Genre {
+							m[g.Name] = true
+						}
+						if len(jr.Data.Fc2Uploader.Name) > 0 {
+							m[jr.Data.Fc2Uploader.Name] = true
+						}
+						for _, s := range jr.Data.Star {
+							m[s.Name] = true
+						}
+						var tags []string
+						for k := range m {
+							tags = append(tags, k)
+						}
+						v.Tags = sort.StringSlice(tags)
+
+						if jr.Data.ID > 0 {
+							found = true
+						}
 					} else {
-						req, err := http.NewRequest("GET", fmt.Sprintf("http://%s/v1/api?action=get_movie&name=%s", metaHost, name), nil)
+						link := fmt.Sprintf("http://%s/v1/api?action=get_movie&name=%s", metaHost, name)
+						if cdn {
+							link += "&cdn=1"
+						} else {
+							link += "&cdn=0"
+						}
+
+						req, err := retryablehttp.NewRequest("GET", link, nil)
 						if err != nil {
 							log.Println(err)
 							return err
@@ -482,22 +525,63 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 							log.Println(err)
 							return err
 						}
-						ttl := 600
+						ttl := 36000
 						if jr.Data.ID > 0 {
-							ttl = 7 * 86400
+							ttl = 432000
 						}
-						Redis.SetValueWithTTL(key, jr, ttl)
-						v.Description = jr.Data.Title
+						lib.Redis.SetValueWithTTL(key, jr, ttl)
+						if jr.Data.UserData.Like {
+							v.Description += `♥️`
+						}
+						if jr.Data.UserData.Score == 5 {
+							v.Description += `🔥`
+						}
+						for i := 0; i < jr.Data.UserData.FavourCount; i++ {
+							v.Description += `👍`
+						}
+						v.Description += jr.Data.Title
 						v.ThumbLink = jr.Data.BackupCover
-						v.Tags = jr.Data.Tags
+						// tags
+						m := make(map[string]bool)
+						for _, t := range jr.Data.Tags {
+							m[t] = true
+						}
+						for _, g := range jr.Data.Genre {
+							m[g.Name] = true
+						}
+						if len(jr.Data.Fc2Uploader.Name) > 0 {
+							m[jr.Data.Fc2Uploader.Name] = true
+						}
+						for _, s := range jr.Data.Star {
+							m[s.Name] = true
+						}
+						var tags []string
+						for k := range m {
+							tags = append(tags, k)
+						}
+						v.Tags = sort.StringSlice(tags)
+						//
 						log.Println(name, "MISS")
+						if jr.Data.ID > 0 {
+							found = true
+						}
+					}
+					// 					log.Println(name, jr.Data.ID)
+				}
+				if name, b := isSearchable(name); !found && b {
+					// 					log.Println("SEARCH", name)
+					res, err := lib.NewSearchClient().Search(name)
+					if err == nil {
+						v.Description = `❗` + res.Title
+					} else {
+						log.Println(err)
 					}
 				}
 				return nil
 			}
 			tasks = append(tasks, golib.NewTask(fc, nil, false))
 		}
-		golib.NewManager(10, 10000).Do(tasks)
+		golib.NewManager(runtime.NumCPU()*10, 10000).Do(tasks)
 		// query thumb end
 		NewResp(w, dir)
 	}
@@ -525,8 +609,24 @@ type JavData struct {
 	LabelID       int       `json:"LabelId"`
 	SeriesID      int       `json:"SeriesId"`
 	Fc2UploaderID int       `json:"Fc2UploaderId"`
-	Tags          []string  `json:"Tags"`
-	Uncensored    bool      `json:"Uncensored"`
+	Fc2Uploader   struct {
+		Name string `json:"Name"`
+	}
+	Star []struct {
+		Name string `json:"Name"`
+	}
+	Tags       []string `json:"Tags"`
+	Genre      []*Genre `json:"Genre"`
+	Uncensored bool     `json:"Uncensored"`
+	UserData   struct {
+		Like        bool `json:"Like"`
+		FavourCount int  `json:"FavourCount"`
+		Score       int8 `json:"Score"`
+	} `json:"UserData"`
+}
+
+type Genre struct {
+	Name string
 }
 
 var (
@@ -535,15 +635,39 @@ var (
 		regexp.MustCompile(`^\d{3}[A-Z]+\-\d+$`),
 		regexp.MustCompile(`^KIN8\-\d+$`),
 		regexp.MustCompile(`^T28\-\d+$`),
+		regexp.MustCompile(`^\d+\-\d+\-CARIB$`),
+	}
+	reSearchable = []*regexp.Regexp{
+		regexp.MustCompile(`^[a-zA-Z]{2,4}\-\d{2,4}$`),
+		regexp.MustCompile(`^zb\d{8}_\d+$`),
 	}
 	mapAV      = make(map[string]string)
 	idreplacer = strings.NewReplacer("-C_X1080X", "", "-C_GG5", "")
 )
 
+func isSearchable(name string) (string, bool) {
+	if strings.HasPrefix(name, "FC2-PPV") {
+		return strings.Split(name, ".")[0], true
+	}
+	for _, re := range reSearchable {
+		if re.MatchString(name) {
+			return name, true
+		}
+	}
+	return name, false
+}
+
 func isAV(name string) (string, bool) {
 	name = idreplacer.Replace(name)
+	if strings.Contains(strings.ToLower(name), "gitchu") {
+		re := regexp.MustCompile(`(gitchu\-\d+)`)
+		if re.MatchString(name) {
+			name = re.ReplaceAllString(name, "$1")
+			return name, true
+		}
+	}
 	if strings.HasPrefix(name, "FC2-PPV") {
-		return name, true
+		return strings.Split(name, ".")[0], true
 	}
 	reIBW := regexp.MustCompile(`^(IBW\-\d+)Z$`)
 	if reIBW.MatchString(name) {

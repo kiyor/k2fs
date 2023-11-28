@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gorilla/sessions"
@@ -27,6 +28,8 @@ func apiSession(w http.ResponseWriter, r *http.Request) {
 	err := session.Save(r, w)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Println(err)
 		return
 	}
+	NewResp(w, "ok")
 }

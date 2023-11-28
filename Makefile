@@ -1,6 +1,8 @@
 VERSION := $(shell cat ./VERSION)
 LDFLAGS := -ldflags "-w -s"
 
+default: image push
+
 release:
 	git tag -a $(VERSION) -m "release" || true
 	git push origin master --tags
@@ -11,8 +13,14 @@ build:
 .PHONY: build
 
 image:
-	docker build -t kiyor/k2fs . && docker push kiyor/k2fs
+	docker build -t kiyor/k2fs .
+	docker build -t kiyor/k2fs:amd64 .
 .PHONY: image
+
+push:
+	docker push kiyor/k2fs
+	docker push kiyor/k2fs:amd64
+.PHONY: push
 
 arm7:
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -mod vendor -a -installsuffix cgo -v ${LDFLAGS} -o ./k2fs .

@@ -34,7 +34,10 @@ func NewResp(w http.ResponseWriter, data interface{}, code ...int) []byte {
 	if err != nil {
 		log.Println(err)
 	}
-	w.Header().Add("content-type", "application/json")
+	w.Header().Add("Content-Type", "application/json")
+	w.Header().Add("Access-Control-Allow-Origin", "*")
+	w.Header().Add("Access-Control-Allow-Methods", "GET,PUT,POST,PATCH,OPTIONS")
+	w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
 	w.Write(b)
 	return b
 }
@@ -114,6 +117,14 @@ func toJSON(i interface{}) string {
 }
 
 func api(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.Header().Add("Access-Control-Allow-Origin", "*")
+		w.Header().Add("Access-Control-Allow-Methods", "GET,PUT,POST,PATCH,OPTIONS")
+		w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
+		w.WriteHeader(200)
+		return
+	}
+
 	q := r.URL.Query()
 	action := q.Get("action")
 	switch action {

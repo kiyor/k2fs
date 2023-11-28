@@ -14,6 +14,7 @@ import (
 	"github.com/NYTimes/gziphandler"
 	"github.com/bluele/gcache"
 	"github.com/gorilla/mux"
+	"github.com/kiyor/k2fs/lib"
 	myhttp "github.com/kiyor/k2fs/pkg/http"
 )
 
@@ -32,8 +33,6 @@ var (
 	//go:embed bootstrap.css
 	bootstrapcss string
 
-	redisHost string
-
 	metaHost string
 
 	flagDf flagSliceString
@@ -48,9 +47,8 @@ func init() {
 	flag.StringVar(&intf, "i", "0.0.0.0", "http service interface address")
 	flag.StringVar(&port, "l", ":8080", "http service listen port")
 	flag.StringVar(&rootDir, "root", ".", "root dir")
-	flag.StringVar(&redisHost, "redis", "192.168.10.10", "redis host")
 	flag.StringVar(&flagHost, "host", "", "host if need overwrite; syntax like http://a.com(:8080)")
-	flag.StringVar(&metaHost, "meta", "192.168.10.31:9000", "meta host")
+	flag.StringVar(&metaHost, "meta", "192.168.10.31", "meta host")
 	flag.Var(&flagDf, "df", "monitor mount dir")
 }
 
@@ -104,7 +102,7 @@ func genSlice(i ...interface{}) chan interface{} {
 
 func main() {
 	flag.Parse()
-	InitRedisPool()
+	lib.InitRedisPool()
 	if rootDir == "." {
 		rootDir, _ = os.Getwd()
 	}
@@ -134,8 +132,10 @@ func main() {
 		w.Write([]byte(bootstrapcss))
 	})
 	fileServer := myhttp.FileServer(myhttp.Dir(rootDir))
+	local := http.FileServer(http.Dir("./local"))
 	r.PathPrefix("/api").HandlerFunc(api)
 	r.PathPrefix("/statics").Handler(http.StripPrefix("/statics", fileServer))
+	r.PathPrefix("/.local").Handler(http.StripPrefix("/.local", local))
 	r.PathPrefix("/photo").HandlerFunc(renderPhoto)
 	r.PathPrefix("/").HandlerFunc(universal)
 	handler := NewLogHandler().Handler(r)

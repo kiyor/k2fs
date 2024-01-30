@@ -642,7 +642,11 @@ var (
 		regexp.MustCompile(`^zb\d{8}_\d+$`),
 	}
 	mapAV      = make(map[string]string)
-	idreplacer = strings.NewReplacer("-C_X1080X", "", "-C_GG5", "")
+	idreplacer = strings.NewReplacer(
+		"-C_X1080X", "",
+		"-C_GG5", "",
+		"[MD]", "",
+	)
 )
 
 func isSearchable(name string) (string, bool) {

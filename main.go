@@ -3,6 +3,7 @@ package main
 import (
 	_ "embed"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -98,6 +99,18 @@ func genSlice(i ...interface{}) chan interface{} {
 		close(o)
 	}()
 	return o
+}
+
+func init() {
+	fmt.Println("A")
+	fmt.Println("B")
+	fmt.Println("C")
+	fmt.Println("D")
+	fmt.Println("E")
+	fmt.Println("F")
+	fmt.Println("G")
+	fmt.Println("H")
+
 }
 
 func main() {

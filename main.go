@@ -3,7 +3,6 @@ package main
 import (
 	_ "embed"
 	"flag"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -17,6 +16,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/kiyor/k2fs/lib"
 	myhttp "github.com/kiyor/k2fs/pkg/http"
+	"golang.org/x/net/webdav"
 )
 
 var (
@@ -102,15 +102,6 @@ func genSlice(i ...interface{}) chan interface{} {
 }
 
 func init() {
-	fmt.Println("A")
-	fmt.Println("B")
-	fmt.Println("C")
-	fmt.Println("D")
-	fmt.Println("E")
-	fmt.Println("F")
-	fmt.Println("G")
-	fmt.Println("H")
-
 }
 
 func main() {
@@ -146,11 +137,27 @@ func main() {
 	})
 	fileServer := myhttp.FileServer(myhttp.Dir(rootDir))
 	local := http.FileServer(http.Dir("./local"))
+
+	davHandler := &webdav.Handler{
+		Prefix:     "/",
+		FileSystem: webdav.Dir(rootDir), // Specify the directory to serve
+		LockSystem: webdav.NewMemLS(),
+	}
+
 	r.PathPrefix("/api").HandlerFunc(api)
 	r.PathPrefix("/statics").Handler(http.StripPrefix("/statics", fileServer))
 	r.PathPrefix("/.local").Handler(http.StripPrefix("/.local", local))
 	r.PathPrefix("/photo").HandlerFunc(renderPhoto)
 	r.PathPrefix("/").HandlerFunc(universal)
+	r.PathPrefix("/webdav").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "OPTIONS" {
+			w.Header().Add("DAV", "1,2")
+			w.Header().Add("Allow", "OPTIONS, GET, HEAD, POST, DELETE, PROPFIND, PROPPATCH, COPY, MOVE, LOCK, UNLOCK")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		davHandler.ServeHTTP(w, r)
+	})
 	handler := NewLogHandler().Handler(r)
 	handler = gziphandler.GzipHandler(handler)
 	http.Handle("/", handler)

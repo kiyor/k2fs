@@ -9,7 +9,6 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -357,31 +356,7 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 			} else {
 				nf.ShortCut = host + replacer.Replace(fp)
 			}
-			// log.Println(nf.ShortCut)
-			// 					nf.ShortCut = "vlc-x-callback://x-callback-url/stream?" + q
-			if isSearch {
-				match := func(name string) bool {
-					if strings.HasPrefix(filter, "!") {
-						return !strings.Contains(nf.Name, filter[1:])
-					} else {
-						return strings.Contains(name, filter)
-					}
-				}
-				if nf.IsDir {
-					if match(nf.Name) {
-						dir.Files = append(dir.Files, nf)
-					} else {
-						for _, v := range nf.Meta.Tags {
-							if match(v) {
-								dir.Files = append(dir.Files, nf)
-								break
-							}
-						}
-					}
-				}
-			} else {
-				dir.Files = append(dir.Files, nf)
-			}
+			dir.Files = append(dir.Files, nf)
 		}
 		desc := true
 		if m["desc"] != "" {
@@ -525,6 +500,7 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 							log.Println(err)
 							return err
 						}
+						log.Println(toJSON(jr))
 						ttl := 36000
 						if jr.Data.ID > 0 {
 							ttl = 432000
@@ -555,6 +531,18 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 						for _, s := range jr.Data.Star {
 							m[s.Name] = true
 						}
+						if len(jr.Data.Studio.Name) > 0 {
+							m[jr.Data.Studio.Name] = true
+						}
+						if len(jr.Data.Label.Name) > 0 {
+							m[jr.Data.Label.Name] = true
+						}
+						if len(jr.Data.Series.Name) > 0 {
+							m[jr.Data.Series.Name] = true
+						}
+						if len(jr.Data.Director.Name) > 0 {
+							m[jr.Data.Director.Name] = true
+						}
 						var tags []string
 						for k := range m {
 							tags = append(tags, k)
@@ -582,6 +570,34 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 			tasks = append(tasks, golib.NewTask(fc, nil, false))
 		}
 		golib.NewManager(runtime.NumCPU()*10, 10000).Do(tasks)
+		if isSearch {
+			match := func(name string) bool {
+				if strings.HasPrefix(filter, "!") {
+					return !strings.Contains(name, filter[1:])
+				} else {
+					return strings.Contains(name, filter)
+				}
+			}
+			var files []*File
+			for _, nf := range dir.Files {
+				if nf.IsDir {
+					if match(nf.Name) {
+						files = append(files, nf)
+					} else {
+						for _, v := range nf.Tags {
+							if match(v) {
+								files = append(files, nf)
+								break
+							}
+						}
+					}
+				}
+			}
+			sort.Slice(files, func(i, j int) bool {
+				return files[i].ModTime.After(files[j].ModTime)
+			})
+			dir.Files = files
+		}
 		// query thumb end
 		NewResp(w, dir)
 	}
@@ -596,19 +612,31 @@ type JavResp struct {
 	Data JavData `json:"Data"`
 }
 type JavData struct {
-	ID            int       `json:"Id"`
-	Name          string    `json:"Name"`
-	Key           string    `json:"Key"`
-	Title         string    `json:"Title"`
-	BackupCover   string    `json:"BackupCover"`
-	CreatedAt     int       `json:"CreatedAt"`
-	ReleaseDate   time.Time `json:"ReleaseDate"`
-	Length        int       `json:"Length"`
-	DirectorID    int       `json:"DirectorId"`
-	StudioID      int       `json:"StudioId"`
-	LabelID       int       `json:"LabelId"`
-	SeriesID      int       `json:"SeriesId"`
-	Fc2UploaderID int       `json:"Fc2UploaderId"`
+	ID          int       `json:"Id"`
+	Name        string    `json:"Name"`
+	Key         string    `json:"Key"`
+	Title       string    `json:"Title"`
+	BackupCover string    `json:"BackupCover"`
+	CreatedAt   int       `json:"CreatedAt"`
+	ReleaseDate time.Time `json:"ReleaseDate"`
+	Length      int       `json:"Length"`
+	DirectorID  int       `json:"DirectorId"`
+	Director    struct {
+		Name string `json:"Name"`
+	} `json:"Director"`
+	StudioID int `json:"StudioId"`
+	Studio   struct {
+		Name string `json:"Name"`
+	} `json:"Studio"`
+	LabelID int `json:"LabelId"`
+	Label   struct {
+		Name string `json:"Name"`
+	} `json:"Label"`
+	SeriesID int `json:"SeriesId"`
+	Series   struct {
+		Name string `json:"Name"`
+	} `json:"Series"`
+	Fc2UploaderID int `json:"Fc2UploaderId"`
 	Fc2Uploader   struct {
 		Name string `json:"Name"`
 	}
@@ -699,7 +727,7 @@ func filePathWalkDir(root string, isDir bool) ([]string, error) {
 
 func ioReadDir(root string) ([]string, error) {
 	var files []string
-	fileInfo, err := ioutil.ReadDir(root)
+	fileInfo, err := os.ReadDir(root)
 	if err != nil {
 		return files, err
 	}

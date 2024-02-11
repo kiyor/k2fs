@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -104,7 +103,7 @@ func apiOperation(w http.ResponseWriter, r *http.Request) {
 				trashMeta := kfs.NewMeta(Trash)
 				// delete trash, delete all file in trash
 				if file == Trash {
-					fs, _ := ioutil.ReadDir(Trash)
+					fs, _ := os.ReadDir(Trash)
 					for _, v := range fs {
 						f := filepath.Join(Trash, v.Name())
 						log.Println("rm -rf", f)

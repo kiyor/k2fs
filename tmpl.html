@@ -125,7 +125,7 @@
                     <li v-for="p in df"><span :class="dfColor(p.usedPercent)">{{p.path}} - {{p.usedPercent}}%</span>
                     </li>[[if .ios]]
                     <li>
-                        <i class="fa-brands fa-apple"></i>
+                        <i class="fab fa-apple"></i>
                     </li>[[end]]
                 </ul>
             </div>
@@ -194,8 +194,8 @@
                                         <li class="sm" v-for="sub in subList[file.Path]">
                                             <a :href="getSubLink(path,file,sub)" :id="sub.Hash"
                                                 style="position:relative;"><span class="overlayertext"
-                                                    @mouseover="singlePic(sub)"
-                                                    @mouseleave="showPic(file)">{{sub.Name}}</span></a>
+                                                    [[if not .ios]]@mouseover="singlePic(sub)"
+                                                    @mouseleave="showPic(file)"[[end]]>{{sub.Name}}</span></a>
                                         </li>
                                     </ul>
                                 </td>

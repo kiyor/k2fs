@@ -146,7 +146,7 @@ const myapp = {
         }
         var search = _getQS('search');
         if (search != undefined) {
-            this.search = search;
+            this.search = decodeURI(search);
             this.listApi();
         }
         //     console.log(this.history); 
@@ -289,8 +289,16 @@ const myapp = {
             }
             console.log("colorCleaner finished")
         },
+        sortTags(tags) {
+            return tags.slice().sort((a, b) => a.localeCompare(b));
+        },
         async clickUpDir() {
             this.hideAllPic();
+            if (this.search.length > 0) {
+                this.search = "";
+                this.changeSearch();
+                return
+            }
             this.path = this.resp.UpDir;
             console.log(this.path);
             await this.listApi();

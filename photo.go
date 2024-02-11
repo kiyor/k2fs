@@ -4,7 +4,6 @@ import (
 	_ "embed"
 	"fmt"
 	"html/template"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -86,8 +85,8 @@ func renderPhoto(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func readDir(path string) (fs []os.FileInfo) {
-	files, err := ioutil.ReadDir(path)
+func readDir(path string) (fs []os.DirEntry) {
+	files, err := os.ReadDir(path)
 	if err != nil {
 		log.Println(err)
 	}

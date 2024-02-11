@@ -20,7 +20,6 @@ require (
 )
 
 require (
-	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/gorilla/securecookie v1.1.1 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect

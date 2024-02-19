@@ -501,9 +501,9 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 							return err
 						}
 						log.Println(toJSON(jr))
-						ttl := 36000
+						ttl := 36000 // if not found, cache for 10 hours
 						if jr.Data.ID > 0 {
-							ttl = 432000
+							ttl = 2592000 // if found, cache for 30 days
 						}
 						lib.Redis.SetValueWithTTL(key, jr, ttl)
 						if jr.Data.UserData.Like {

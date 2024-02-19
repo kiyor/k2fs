@@ -290,6 +290,16 @@ const myapp = {
             console.log("colorCleaner finished")
         },
         sortTags(tags) {
+            if (tags === undefined) {
+                return []
+            }
+            // check if is null
+            if (tags === null) {
+                return []
+            }
+            if (tags.length === 0) {
+                return []
+            }
             return tags.slice().sort((a, b) => a.localeCompare(b));
         },
         async clickUpDir() {

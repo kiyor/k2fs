@@ -179,7 +179,7 @@
                                             class="far fa-folder-open"></i></span>
                                     <span v-if="file.IsDir" @click.prevent="onClick(path,file)"> {{file.Name}} <span
                                             v-if="file.Description">{{file.Description}} </span><span
-                                            v-for="tag in file.Tags"><button type="button"
+                                            v-for="tag in sortTags(file.Tags)"><button type="button"
                                                 class="btn btn-info btn-sm tag"
                                                 @click="search=tag;changeSearch()">{{tag}}</button></span><span
                                             v-for="tag in file.Meta.Tags"><button type="button"

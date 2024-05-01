@@ -1,4 +1,4 @@
-FROM golang:1.18 as builder
+FROM golang:1.22 as builder
 WORKDIR /go/src/k2fs
 COPY vendor ./vendor
 COPY lib ./lib
@@ -14,7 +14,7 @@ RUN go build -mod vendor -a -installsuffix cgo -o k2fs .
 
 #FROM alpine:3.3
 #RUN apk update && apk add ca-certificates su-exec unzip unrar tzdata && rm -rf /var/cache/apk/*
-FROM ubuntu
+FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -qq && apt-get install -qqy \
     apt-transport-https \
@@ -23,6 +23,7 @@ RUN apt-get update -qq && apt-get install -qqy \
     curl \
     unzip \
     unrar \
+    libc6 \
     locales
 RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
     locale-gen

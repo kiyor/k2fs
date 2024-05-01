@@ -145,7 +145,7 @@
             </div>
             <div class="row">
                 <div class="col-11">
-                    <table class="table table-hover">
+                    <table class="table table-hover" id='table'>
                         <thead>
                             <tr class="lg">
                                 <th id="thicon">Icon</th>
@@ -264,6 +264,11 @@
                     <button type="button" class="btn btn-lg btn-warning" @click="operation('label=warning')">Label 3</button>
                     <button type="button" class="btn btn-lg btn-danger" @click="operation('label=danger')">Label 4</button>
                 </div>
+                <hr />
+                <div class="btn-group-vertical" role="group" aria-label="Vertical button group">
+                    <button type="button" class="btn btn-lg btn-dark" @click="operation('restore')">Restore</button>
+                </div>
+                <hr />
             </div>
         </div>
 

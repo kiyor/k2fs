@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/kiyor/k2fs/lib"
 	kfs "github.com/kiyor/k2fs/lib"
 )
 
@@ -35,16 +36,24 @@ func apiOperation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// log.Println(toJSON(op))
-
 	path := filepath.Join(rootDir, op.Dir)
 
 	meta := kfs.NewMeta(path)
-	// 	log.Println(toJSON(meta))
 	for k, b := range op.Files {
 		file := filepath.Join(path, k)
 		if b {
 			m, _ := meta.Get(k)
+			key := filepath.Join(op.Dir, k)
+			// log.Println("-------------->", key)
+			m2, err := metaV2.Get(key)
+			if err != nil {
+				m2, err = metaV2.LoadPath(key)
+				if err != nil {
+					// log.Println(key, err)
+					continue
+				}
+			}
+			// log.Println("-------------->", toJSON(m2))
 			switch {
 			case op.Action == "unzip":
 				var cmd string
@@ -78,6 +87,7 @@ func apiOperation(w http.ResponseWriter, r *http.Request) {
 					m.Label = ""
 				}
 				meta.Set(k, m)
+				m2.SetLabel(m.Label)
 			case strings.HasPrefix(op.Action, "icons"):
 				to := strings.Split(op.Action, "=")
 				m.Icons = []string{}
@@ -90,6 +100,7 @@ func apiOperation(w http.ResponseWriter, r *http.Request) {
 			case op.Action == "star":
 				m.Star = !m.Star
 				meta.Set(k, m)
+				m2.SetStar(m.Star)
 			case strings.HasPrefix(op.Action, "star"):
 				to := strings.Split(op.Action, "=")
 				if len(to) > 1 && len(to[1]) > 0 {
@@ -98,6 +109,18 @@ func apiOperation(w http.ResponseWriter, r *http.Request) {
 					m.Star = false
 				}
 				meta.Set(k, m)
+				m2.SetStar(m.Star)
+			case op.Action == "restore":
+				if strings.HasPrefix(file, Trash) {
+					dst := filepath.Join(m.OldLoc)
+					log.Println("mv", file, dst)
+					os.Rename(file, dst)
+					dstMeta := kfs.NewMeta(filepath.Dir(dst))
+					dstMeta.Set(k, m)
+					dstMeta.Write()
+					meta.Del(k)
+					lib.Cache.Remove("size:.Trash")
+				}
 			case op.Action == "delete":
 				log.Println(file, Trash)
 				trashMeta := kfs.NewMeta(Trash)
@@ -125,8 +148,12 @@ func apiOperation(w http.ResponseWriter, r *http.Request) {
 					if err != nil {
 						log.Println(err)
 					}
+					metaV2.MoveDir(key, ".Trash")
 				}
-				cache.Remove("size:" + Trash)
+				lib.Cache.Remove("size:.Trash")
+				metaV2.RemoveOrphan(".Trash")
+				metaV2.Index(".Trash")
+				dirSize2(".Trash")
 			}
 		}
 	}
@@ -137,5 +164,4 @@ func apiOperation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	NewResp(w, "success")
-	// 	log.Println(toJSON(meta))
 }

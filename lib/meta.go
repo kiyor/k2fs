@@ -2,7 +2,6 @@ package lib
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -62,7 +61,7 @@ func (m *Meta) Load(path string) error {
 		m.mu = &sync.Mutex{}
 	}
 	metaFile := filepath.Join(path, KFS)
-	b, err := ioutil.ReadFile(metaFile)
+	b, err := os.ReadFile(metaFile)
 	if err != nil {
 		log.Println(err.Error())
 		return err

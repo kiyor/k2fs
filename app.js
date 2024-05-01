@@ -121,6 +121,7 @@ const myapp = {
             clickTimer: null,
             search: "",
             isShowing: "",
+            hoveredFile: "",
             history: [],
         }
     },
@@ -149,6 +150,26 @@ const myapp = {
             this.search = decodeURI(search);
             this.listApi();
         }
+        window.addEventListener('keydown', (event) => {
+            if (event.key === 'd') {
+                this.operation("delete");
+            }
+            if (event.key === '4') {
+                this.operation('label=danger');
+            }
+            if (event.key === '5') {
+                let s = this.select;
+                let p = this.path;
+                this.operation('label=danger');
+                this.select = s;
+                this.path = p;
+                this.operation('star');
+            }
+            if (event.key === 's') {
+                this.select[this.hoveredFile] = !this.select[this.hoveredFile];
+                _show();
+            }
+        });
         //     console.log(this.history); 
     },
     methods: {
@@ -572,6 +593,15 @@ const myapp = {
             var i = this.history[this.history.length - 1];
             console.log("need scrollTo: " + i);
             _jump(i);
+            document.querySelectorAll('#table tr').forEach(row => {
+                row.addEventListener('mouseover', () => {
+                    this.hoveredFile = row.id;
+                    console.log("mouseover",this.hoveredFile);
+                });
+                row.addEventListener('mouseout', () => {
+                    console.log("mouseout");
+                });
+            });
         },
         async listSubApi(path) {
             var data = {};

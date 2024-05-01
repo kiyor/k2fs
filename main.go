@@ -9,10 +9,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strings"
 	"text/template"
+	"time"
 
 	"github.com/NYTimes/gziphandler"
-	"github.com/bluele/gcache"
 	"github.com/gorilla/mux"
 	"github.com/kiyor/k2fs/lib"
 	myhttp "github.com/kiyor/k2fs/pkg/http"
@@ -101,6 +102,8 @@ func genSlice(i ...interface{}) chan interface{} {
 	return o
 }
 
+var metaV2 *lib.MetaV2
+
 func init() {
 }
 
@@ -110,7 +113,8 @@ func main() {
 	if rootDir == "." {
 		rootDir, _ = os.Getwd()
 	}
-	cache = gcache.New(cacheMax).LRU().Build()
+	metaV2 = lib.NewMetaV2(rootDir)
+	// cache = gcache.New(cacheMax).LRU().Build()
 	addr = intf + port
 	Trash = filepath.Join(rootDir, ".Trash")
 	if _, err := os.Stat(Trash); err != nil {
@@ -118,6 +122,29 @@ func main() {
 	}
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
+	go func() {
+		for {
+			t1 := time.Now()
+			log.Println("start index")
+			metaV2.Index()
+			log.Println("index done", time.Since(t1))
+			t2 := time.Now()
+			metaV2.RemoveOrphan()
+			log.Println("remove orphan done", time.Since(t2))
+			t3 := time.Now()
+			metaV2.CacheSize()
+			log.Println("cache size done", time.Since(t3))
+			time.Sleep(55 * time.Minute)
+		}
+	}()
+	go func() {
+		for {
+			log.Printf("LEN: %d; HIT: %.2f; COUNT: %d", lib.Cache.Len(true), lib.Cache.HitRate()*100, lib.Cache.LookupCount())
+			time.Sleep(5 * time.Minute)
+		}
+
+	}()
 
 	r := mux.NewRouter()
 	r.Path("/app.js").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -148,7 +175,6 @@ func main() {
 	r.PathPrefix("/statics").Handler(http.StripPrefix("/statics", fileServer))
 	r.PathPrefix("/.local").Handler(http.StripPrefix("/.local", local))
 	r.PathPrefix("/photo").HandlerFunc(renderPhoto)
-	r.PathPrefix("/").HandlerFunc(universal)
 	r.PathPrefix("/webdav").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "OPTIONS" {
 			w.Header().Add("DAV", "1,2")
@@ -158,6 +184,16 @@ func main() {
 		}
 		davHandler.ServeHTTP(w, r)
 	})
+	r.PathPrefix("/s").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		path = strings.TrimPrefix(path, "/s/")
+		if short, ok := shortUrl[path]; ok {
+			http.Redirect(w, r, short, http.StatusFound)
+		} else {
+			http.NotFound(w, r)
+		}
+	})
+	r.PathPrefix("/").HandlerFunc(universal)
 	handler := NewLogHandler().Handler(r)
 	handler = gziphandler.GzipHandler(handler)
 	http.Handle("/", handler)

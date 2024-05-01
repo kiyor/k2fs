@@ -1,17 +1,18 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
 	golib "github.com/kiyor/golib"
+	"github.com/kiyor/k2fs/lib"
 	kfs "github.com/kiyor/k2fs/lib"
 )
 
@@ -58,7 +59,7 @@ func NewCacheResp(w http.ResponseWriter, data interface{}, cacheKey string, expi
 	}
 	w.Header().Add("content-type", "application/json")
 	w.Write(b)
-	cache.SetWithExpire(cacheKey, b, expire)
+	lib.Cache.SetWithExpire(cacheKey, b, expire)
 	return b
 }
 
@@ -148,21 +149,47 @@ func apiDf(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(toJSON(du)))
 }
 
-var sizeManager = golib.NewManager(runtime.NumCPU(), 100000)
+var sizeManager = golib.NewManager(1, 100000)
 var sizeTasks = make(chan golib.Task)
 
 func init() {
 	sizeManager.Start(sizeTasks)
 }
 
+func dirSize2(path string) (int64, error) {
+	path = strings.TrimLeft(path, "/")
+	key := "size:" + path
+	if val, err := lib.Cache.Get(key); err == nil {
+		return int64(val.(float64)), nil
+	}
+	sizeTasks <- golib.NewTask(
+		func() error {
+			if _, err := lib.Cache.Get(key); err == nil {
+				return nil
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+			defer cancel()
+			size, err := metaV2.SizeWithTimeout(path, ctx)
+			if err != nil {
+				return err
+			}
+			lib.Cache.SetWithExpire(key, size, time.Hour)
+			return nil
+		},
+		nil,
+		false,
+	)
+	return 1, nil
+}
+
 func dirSize(path string) (int64, error) {
 	key := "size:" + path
-	if val, err := cache.Get(key); err == nil {
+	if val, err := lib.Cache.Get(key); err == nil {
 		return val.(int64), nil
 	}
 	sizeTasks <- golib.NewTask(
 		func() error {
-			if _, err := cache.Get(key); err == nil {
+			if _, err := lib.Cache.Get(key); err == nil {
 				return nil
 			}
 			var size int64
@@ -176,7 +203,7 @@ func dirSize(path string) (int64, error) {
 				return err
 			})
 			if err == nil {
-				cache.SetWithExpire(key, size, cacheTimeout)
+				lib.Cache.SetWithExpire(key, size, time.Hour)
 			}
 			return err
 		},

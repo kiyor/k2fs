@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/md5"
+	"encoding/base64"
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
@@ -38,10 +40,13 @@ var hideExt = []string{
 	".URL",
 	".HTM",
 	".HTML",
+	".db",
 	kfs.KFS,
 }
 var hideContain = []string{
 	"padding_file",
+	".DS_Store",
+	".kfs.db",
 }
 var videoExt = []string{
 	".mp4",
@@ -135,7 +140,7 @@ func apiThumb(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cacheKey := buildCacheKey(r, m)
-	if val, err := cache.Get(cacheKey); err == nil {
+	if val, err := lib.Cache.Get(cacheKey); err == nil {
 		w.Header().Add("content-type", "application/json")
 		w.Write(val.([]byte))
 		return
@@ -223,7 +228,7 @@ func isImage(path string) bool {
 
 func apiList(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
-	m := make(map[string]string)
+	args := make(map[string]string)
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Println(err)
@@ -231,15 +236,15 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// log.Println(string(b))
-	err = json.Unmarshal(b, &m)
+	err = json.Unmarshal(b, &args)
 	if err != nil {
 		log.Println(string(b), err)
 		NewErrResp(w, 1, err)
 		return
 	}
-	filter := m["search"]
+	filter := args["search"]
 	// 	path := "." + q.Get("path")
-	path := m["path"]
+	path := args["path"]
 	if strings.Contains(path, "%") {
 		path, _ = url.PathUnescape(path)
 	}
@@ -247,8 +252,8 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 	if len(path) == 0 {
 		path = "/"
 	}
-	if _, ok := m["listdir"]; !ok {
-		m["listdir"] = "read"
+	if _, ok := args["listdir"]; !ok {
+		args["listdir"] = "read"
 	}
 	abs := filepath.Join(rootDir, path)
 	f, err := os.Stat(abs)
@@ -257,7 +262,7 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var isRead, isFind, isSearch bool
-	switch m["listdir"] {
+	switch args["listdir"] {
 	case "read":
 		isRead = true
 	case "find":
@@ -296,20 +301,25 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 		dir.Dir = path
 		dir.Hash = hash(path)
 		dir.UpDir = upDir(dir.Dir)
-		if isRead {
-			for _, f := range list {
-				dirSize(filepath.Join(abs, f.Name()))
-			}
-		}
-		time.Sleep(200 * time.Millisecond)
+		/*
+				if isRead {
+					for _, f := range list {
+						// dirSize(filepath.Join(abs, f.Name()))
+						dirSize2(filepath.Join(path, f.Name()))
+					}
+				}
+			 remove for test
+		*/
+		// time.Sleep(200 * time.Millisecond)
 
 		//TODO optimize search/filter, do before some action like size()
 		for p, f := range list {
 			nf := NewFile(f.Name())
 			nf.Hash = hash(filepath.Join(abs, f.Name()))
 			if isRead {
-				fullPath := filepath.Join(abs, f.Name())
-				nf.Size, err = dirSize(fullPath)
+				// fullPath := filepath.Join(abs, f.Name())
+				// nf.Size, err = dirSize(fullPath)
+				nf.Size, err = dirSize2(filepath.Join(path, f.Name()))
 				if err != nil {
 					log.Println(err)
 				}
@@ -329,8 +339,18 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 			}
 			d, _ := filepath.Split(nf.Path)
 			meta := kfs.NewMeta(filepath.Join(rootDir, d))
+			// meta2 := kfs.NewMetaV2(rootDir)
 			if m, ok := meta.Get(nf.Name); ok {
 				nf.Meta = m
+				// meta2.Set(&kfs.MetaInfoV2{
+				// 	Path:    nf.Path,
+				// 	Size:    nf.Size,
+				// 	ModTime: nf.ModTime,
+				// 	Label:   m.Label,
+				// 	Tags:    m.Tags,
+				// 	Star:    m.Star,
+				// })
+				// log.Println(nf.Path)
 			}
 			// 			fp := filepath.Join("/statics", path, f.Name())
 			fp := filepath.Join("/statics", p)
@@ -339,9 +359,11 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 			if len(flagHost) > 0 {
 				host = flagHost
 			}
+			b64md5fp := enc(fp)
 			if isVideo(nf.Name) {
 				qv := url.Values{}
-				qv["url"] = []string{host + fp}
+				// qv["url"] = []string{host + fp}
+				qv["url"] = []string{host + "/s/" + b64md5fp}
 				q := replacer.Replace(qv.Encode())
 				switch {
 				case isMac(r):
@@ -359,8 +381,8 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 			dir.Files = append(dir.Files, nf)
 		}
 		desc := true
-		if m["desc"] != "" {
-			session.Values["desc"] = []string{m["desc"]}
+		if args["desc"] != "" {
+			session.Values["desc"] = []string{args["desc"]}
 		}
 		if des, ok := session.Values["desc"]; ok {
 			d := des.([]string)
@@ -373,8 +395,8 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 				log.Println(d)
 			}
 		}
-		if m["sortby"] != "" {
-			session.Values["sortby"] = []string{m["sortby"]}
+		if args["sortby"] != "" {
+			session.Values["sortby"] = []string{args["sortby"]}
 		}
 		if sortby, ok := session.Values["sortby"]; ok {
 			s := sortby.([]string)
@@ -500,7 +522,7 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 							log.Println(err)
 							return err
 						}
-						log.Println(toJSON(jr))
+						// log.Println(toJSON(jr))
 						ttl := 36000 // if not found, cache for 10 hours
 						if jr.Data.ID > 0 {
 							ttl = 2592000 // if found, cache for 30 days
@@ -557,12 +579,30 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 					// 					log.Println(name, jr.Data.ID)
 				}
 				if name, b := isSearchable(name); !found && b {
-					// 					log.Println("SEARCH", name)
-					res, err := lib.NewSearchClient().Search(name)
-					if err == nil {
-						v.Description = `❗` + res.Title
+					// log.Println("SEARCH", name)
+					key := "search:" + name
+					if val, err := lib.Cache.Get(key); err == nil {
+						v.Description = `❗` + val.(string)
 					} else {
-						log.Println(err)
+						if val, err := metaV2.Get(v.Path); err == nil {
+							if val.Context["Title"] != nil {
+								v.Description = `❗` + val.Context["Title"].(string)
+								lib.Cache.SetWithExpire(key, val.Context["Title"].(string), 24*time.Hour)
+							} else {
+								res, err := lib.NewSearchClient().Search(name)
+								if err == nil {
+									v.Description = `❗` + res.Title
+									if val.Context == nil {
+										val.Context = make(map[string]interface{})
+									}
+									val.Context["Title"] = res.Title
+									metaV2.Set(val)
+									lib.Cache.SetWithExpire(key, res.Title, 24*time.Hour)
+								} else {
+									log.Println(err)
+								}
+							}
+						}
 					}
 				}
 				return nil
@@ -756,4 +796,23 @@ func slice2fileinfo(s []string, prefix string) (map[string]os.FileInfo, error) {
 		}
 	}
 	return fs, nil
+}
+
+var shortUrl = make(map[string]string)
+
+func enc(s string) string {
+	v := md5Encode(base64Encode(s))
+	shortUrl[v] = s
+	// log.Println(v, s)
+	return v
+}
+
+func base64Encode(s string) string {
+	v := base64.StdEncoding.EncodeToString([]byte(s))
+	return v
+}
+
+func md5Encode(s string) string {
+	v := fmt.Sprintf("%x", md5.Sum([]byte(s)))
+	return v
 }

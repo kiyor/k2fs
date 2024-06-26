@@ -2,8 +2,8 @@ package lib
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -12,31 +12,32 @@ import (
 	"time"
 
 	"github.com/bluele/gcache"
-	_ "github.com/mattn/go-sqlite3"
-	"xorm.io/xorm"
+	//_ "github.com/mattn/go-sqlite3"
+	"gorm.io/datatypes"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
-var Cache = gcache.New(10000).LRU().Build()
+var Cache = gcache.New(20000).LRU().Build()
 
-func (m *MetaV2) db() *xorm.Engine {
-	// m.mu.Lock()
-	// defer m.mu.Unlock()
-	if m.Engine == nil {
+func (m *MetaV2) db() *gorm.DB {
+	if m.DB == nil {
 		path := filepath.Join(m.Root, ".kfs.db?cache=shared&_mutex=full")
-		// var needIndex bool
-		// if _, err := os.Stat(path); err != nil {
-		// 	needIndex = true
-		// }
+		mod := logger.Silent
+		showSQL, _ := strconv.ParseBool(os.Getenv("SHOW_SQL"))
+		if showSQL {
+			mod = logger.Info
+		}
+		db, err := gorm.Open(sqlite.Open(path), &gorm.Config{
+			Logger: logger.Default.LogMode(mod),
+		})
 
-		x, err := xorm.NewEngine("sqlite3", path)
 		if err != nil {
 			log.Fatal(err)
 		}
-		showSQL, _ := strconv.ParseBool(os.Getenv("SHOW_SQL"))
-		x.ShowSQL(showSQL)
-		// x.Logger().SetLevel(xlog.LOG_WARNING)
 
-		m.Engine = x
+		m.DB = db
 		for _, v := range []string{
 			"PRAGMA journal_mode=WAL;",
 			"PRAGMA synchronous=NORMAL;",
@@ -46,20 +47,21 @@ func (m *MetaV2) db() *xorm.Engine {
 			"PRAGMA busy_timeout = 30000;",
 			"PRAGMA secure_delete = ON;",
 		} {
-			_, err := m.Engine.Exec(v)
+			res := m.Exec(v)
+			err := res.Error
 			if err != nil {
 				log.Fatal(err)
 			}
 		}
 	}
-	return m.Engine
+	return m.DB
 }
 
 func (m *MetaV2) init() error {
 	tables := []interface{}{MetaInfoV2{}}
 	var errs error
 	for _, v := range tables {
-		err := m.db().Sync2(v)
+		err := m.db().AutoMigrate(v)
 		if err != nil {
 			errs = errors.Join(errs, err)
 		}
@@ -68,15 +70,13 @@ func (m *MetaV2) init() error {
 }
 
 type MetaV2 struct {
-	*xorm.Engine
+	*gorm.DB
 	Root string
-	// mu   *sync.Mutex
 }
 
 func NewMetaV2(root string) *MetaV2 {
 	m := MetaV2{
 		Root: root,
-		// mu:   &sync.Mutex{},
 	}
 	err := m.init()
 	if err != nil {
@@ -90,12 +90,15 @@ func (m *MetaV2) LoadPath(relPath string) (*MetaInfoV2, error) {
 	if err != nil {
 		return nil, err
 	}
-	return m.NewInfo(relPath, info)
+	go m.IndexDynamicly(relPath)
+	i, _, err := m.NewInfo(relPath, info)
+	return i, err
 }
 
 // MoveDir("Downloads/xxx", ".Trash") -> move all files in Downloads/xxx to .Trash/xxx
 func (m *MetaV2) MoveDir(srcDir, dstDir string) error {
 	srcDir = strings.TrimLeft(srcDir, "/")
+	dstDir = strings.TrimLeft(dstDir, "/")
 
 	infos, err := m.List(MetaV2ListOptions{Prefix: &srcDir})
 	if err != nil {
@@ -118,12 +121,12 @@ func (m *MetaV2) MoveDir(srcDir, dstDir string) error {
 	return nil
 }
 
-func (m *MetaV2) NewInfo(path string, info os.FileInfo) (*MetaInfoV2, error) {
+func (m *MetaV2) NewInfo(path string, info os.FileInfo) (*MetaInfoV2, bool, error) {
+	path = strings.TrimLeft(path, "/")
 	i, err := m.Get(path)
 	if err != nil {
 		// file not exist
 		var dir string
-		// log.Println(path, "isdir", info.IsDir())
 		if info.IsDir() {
 			dir = path
 		} else {
@@ -136,47 +139,71 @@ func (m *MetaV2) NewInfo(path string, info os.FileInfo) (*MetaInfoV2, error) {
 			ModTime: info.ModTime(),
 		}
 		m.Set(i)
-		return i, nil
+		return i, true, nil
 	}
-	if i.ModTime == info.ModTime() && i.Size == info.Size() {
-		return i, nil
+	if i.ModTime.Equal(info.ModTime()) && i.Size == info.Size() {
+		return i, false, nil
 	} else {
+		if i.ModTime.Equal(info.ModTime()) {
+			log.Println("update", path, i.Size, "->", info.Size())
+		} else if i.Size == info.Size() {
+			log.Println("update", path, i.ModTime.Format(time.RFC3339), info.ModTime().Format(time.RFC3339))
+		} else {
+			log.Println("update", path, i.ModTime.Format(time.RFC3339), "->", info.ModTime().Format(time.RFC3339), i.Size, "->", info.Size())
+		}
 		i.Size = info.Size()
 		i.ModTime = info.ModTime()
-		m.Set(i)
+		m.db().Updates(i)
+		return i, true, nil
 	}
-	return i, nil
 }
 
 func (m *MetaV2) Get(path string) (*MetaInfoV2, error) {
+	path = strings.TrimLeft(path, "/")
 	info := MetaInfoV2{
 		Path:   path,
 		MetaV2: m,
 	}
-	has, err := m.db().Get(&info)
-	if err != nil {
-		return nil, err
+	res := m.db().First(&info)
+	if res.Error != nil {
+		return nil, res.Error
 	}
-	if has {
-		return &info, nil
-	} else {
-		return nil, fmt.Errorf("not found")
-	}
+	return &info, nil
 }
 
 type MetaInfoV2 struct {
-	Path    string    `json:"path" xorm:"pk"`
-	Dir     string    `json:"dir" xorm:"index"`
-	Size    int64     `json:"size"`
-	ModTime time.Time `json:"mod_time"`
-	Label   string    `json:"label"`
-	Tags    []string  `json:"tags"`
-	Star    bool      `json:"star"`
-	Icons   []string  `json:"icons"`
+	Path    string         `json:"path" xorm:"pk" gorm:"primaryKey"`
+	Dir     string         `json:"dir" xorm:"index" gorm:"index"`
+	Size    int64          `json:"size"`
+	ModTime time.Time      `json:"mod_time"`
+	Label   string         `json:"label"`
+	Tags    datatypes.JSON `json:"tags"`
+	Star    bool           `json:"star"`
+	Icons   datatypes.JSON `json:"icons"`
 	OldLoc  string
-	Context map[string]interface{}
-	MetaV2  *MetaV2 `xorm:"-"`
+	Context datatypes.JSON
+	MetaV2  *MetaV2 `xorm:"-" gorm:"-"`
 }
+
+// SetContext sets the context map to the Context field
+func (m *MetaInfoV2) SetContext(ctx map[string]interface{}) error {
+	bytes, err := json.Marshal(ctx)
+	if err != nil {
+		return err
+	}
+	m.Context = datatypes.JSON(bytes)
+	return nil
+}
+
+// GetContext returns the context map from the Context field
+func (m *MetaInfoV2) GetContext() map[string]interface{} {
+	var ctx map[string]interface{}
+	if err := json.Unmarshal(m.Context, &ctx); err != nil {
+		return nil
+	}
+	return ctx
+}
+
 type MetaInfoV2s []MetaInfoV2
 
 func (i *MetaInfoV2) GetDir() string {
@@ -224,6 +251,40 @@ func (m *MetaV2) Index(prefixs ...string) error {
 	return nil
 }
 
+// index a path possible still in progress
+func (m *MetaV2) IndexDynamicly(prefixs ...string) error {
+	if len(prefixs) == 0 {
+		prefixs = append(prefixs, "")
+	}
+	var recheck bool
+	for _, prefix := range prefixs {
+		prefix = strings.TrimLeft(prefix, "/")
+		err := filepath.Walk(filepath.Join(m.Root, prefix), func(path string, info os.FileInfo, err error) error {
+			path, err = filepath.Rel(m.Root, path)
+			if err != nil {
+				return err
+			}
+			_, changed, _ := m.NewInfo(path, info)
+			if changed {
+				recheck = true
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+	}
+	if recheck {
+		time.Sleep(10 * time.Second)
+		for _, prefix := range prefixs {
+			prefix = strings.TrimLeft(prefix, "/")
+			Cache.Remove("size:" + prefix)
+		}
+		return m.IndexDynamicly(prefixs...)
+	}
+	return nil
+}
+
 func (m *MetaV2) RemoveOrphan(prefixs ...string) error {
 	if len(prefixs) == 0 {
 		prefixs = append(prefixs, "")
@@ -244,9 +305,9 @@ func (m *MetaV2) RemoveOrphan(prefixs ...string) error {
 
 func (m *MetaV2) CacheSize() error {
 	var infos MetaInfoV2s
-	err := m.db().Distinct("dir").Cols("dir").Find(&infos)
-	if err != nil {
-		return err
+	res := m.db().Distinct("dir").Find(&infos)
+	if res.Error != nil {
+		return res.Error
 	}
 	for _, i := range infos {
 		size, err := m.Size(i.Dir)
@@ -254,16 +315,13 @@ func (m *MetaV2) CacheSize() error {
 			return err
 		}
 		Cache.SetWithExpire("size:"+i.Dir, size, time.Hour)
-		time.Sleep(time.Millisecond * 1)
-		// log.Println("cache size", i.Dir, size)
 	}
 
 	return nil
 }
 
 func (m *MetaV2) Close() error {
-	m.db().Close()
-	m.Engine = nil
+	m.DB = nil
 	return nil
 }
 
@@ -273,24 +331,25 @@ type MetaV2ListOptions struct {
 
 func (m *MetaV2) List(opts MetaV2ListOptions) (MetaInfoV2s, error) {
 	var list MetaInfoV2s
-	session := m.db().NewSession()
+	session := m.db().Session(&gorm.Session{})
 	if opts.Prefix != nil {
-		session.Where("path like ?", *opts.Prefix+"%")
+		session = session.Where("path like ?", *opts.Prefix+"%")
 	}
-	err := session.Find(&list)
-	return list, err
+	res := session.Find(&list)
+	return list, res.Error
 }
 
 func (m *MetaV2) Size(prefix string) (float64, error) {
-	f, err := m.db().Where("path like ?", prefix+"%").Sum(&MetaInfoV2{}, "size")
-	if err != nil {
-		return 0, err
+	var sumSize int64
+	m.db().Model(MetaInfoV2{}).Select("SUM(size) as size").Where("path LIKE ?", prefix+"%").Find(&sumSize)
+	if sumSize == 0 {
+		// m.Index(prefix)
+		go m.IndexDynamicly(prefix)
+		time.Sleep(100 * time.Millisecond)
+		m.db().Model(MetaInfoV2{}).Select("SUM(size) as size").Where("path LIKE ?", prefix+"%").Find(&sumSize)
+		return float64(sumSize), nil
 	}
-	if f == 0.0 {
-		m.Index(prefix)
-		return m.db().Where("path like ?", prefix+"%").Sum(&MetaInfoV2{}, "size")
-	}
-	return f, nil
+	return float64(sumSize), nil
 }
 
 func (m *MetaV2) SizeWithTimeout(prefix string, ctx context.Context) (float64, error) {
@@ -322,11 +381,13 @@ func (m *MetaV2) Set(val *MetaInfoV2) *MetaInfoV2 {
 	if val == nil {
 		return nil
 	}
+	val.Path = strings.TrimLeft(val.Path, "/")
+	val.Dir = strings.TrimLeft(val.Dir, "/")
 	_, err := m.Get(val.Path)
 	if err != nil {
-		m.db().Insert(val)
+		m.db().Create(val)
 	} else {
-		m.db().Where("path = ?", val.Path).Update(val)
+		m.db().Updates(val)
 	}
 	val.MetaV2 = m
 	return val

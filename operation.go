@@ -36,6 +36,8 @@ func apiOperation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// log.Println(toJSON(op))
+
 	path := filepath.Join(rootDir, op.Dir)
 
 	meta := kfs.NewMeta(path)

@@ -1,7 +1,7 @@
 VERSION := $(shell cat ./VERSION)
 LDFLAGS := -ldflags "-w -s"
 
-default: image push
+default: build image push
 
 release:
 	git tag -a $(VERSION) -m "release" || true
@@ -9,7 +9,8 @@ release:
 .PHONY: release
 
 build:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod vendor -a -installsuffix cgo -v ${LDFLAGS} -o ./k2fs .
+	#CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod vendor -a -installsuffix cgo -v ${LDFLAGS} -o ./k2fs .
+	GOOS=linux GOARCH=amd64 go build -mod vendor -o ./k2fs .
 .PHONY: build
 
 image:

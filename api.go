@@ -152,8 +152,51 @@ func apiDf(w http.ResponseWriter, r *http.Request) {
 var sizeManager = golib.NewManager(1, 100000)
 var sizeTasks = make(chan golib.Task)
 
+var titleManager = golib.NewManager(1, 100000)
+var titleTasks = make(chan golib.Task)
+
 func init() {
 	sizeManager.Start(sizeTasks)
+	titleManager.Start(titleTasks)
+}
+
+func fetchTitle(path string) (string, error) {
+	key := "title:" + path
+	titleTasks <- golib.NewTask(
+		func() error {
+			if _, err := lib.Cache.Get(key); err == nil {
+				return nil
+			} else {
+				if val, err := metaV2.Get(path); err == nil {
+					ctx := val.GetContext()
+					if ctx != nil && ctx["Title"] != nil {
+						lib.Cache.SetWithExpire(key, ctx["Title"].(string), 24*time.Hour)
+					} else {
+						name := strings.Trim(path, "/")
+						name = filepath.Base(name)
+						name, _ = isSearchable(name)
+						res, err := lib.NewSearchClient().Search(name)
+						if err == nil {
+							if ctx == nil {
+								ctx = make(map[string]interface{})
+							}
+							ctx["Title"] = res.Title
+							val.SetContext(ctx)
+							metaV2.Set(val)
+							lib.Cache.SetWithExpire(key, res.Title, 24*time.Hour)
+						} else {
+							log.Println(err)
+						}
+					}
+				}
+				// log.Println("fetch title", key)
+			}
+			return nil
+		},
+		nil,
+		false,
+	)
+	return "", nil
 }
 
 func dirSize2(path string) (int64, error) {

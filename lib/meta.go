@@ -13,6 +13,8 @@ const (
 	KFS = ".KFS_META"
 )
 
+var locker = make(map[string]*sync.RWMutex)
+
 var user [2]int
 var userEnabled bool
 
@@ -30,17 +32,25 @@ func NewMetaInfo() MetaInfo {
 type Meta struct {
 	Root     string
 	MetaInfo map[string]MetaInfo
-	mu       *sync.Mutex
+	mu       *sync.RWMutex
 }
 
 type DefaultMeta *Meta
 
 func NewMeta(path string) *Meta {
+	if val, ok := locker[path]; ok {
+		val.Lock()
+	} else {
+		locker[path] = &sync.RWMutex{}
+		locker[path].Lock()
+	}
 	m := Meta{
 		MetaInfo: make(map[string]MetaInfo),
-		mu:       &sync.Mutex{},
+		mu:       locker[path],
 	}
-	err := m.Load(path)
+	defer m.mu.Unlock()
+
+	err := m.load(path)
 	if err != nil {
 		m.init(path)
 	}
@@ -53,12 +63,9 @@ func (m *Meta) init(path string) {
 	os.WriteFile(filepath.Join(m.Root, KFS), b, 0644)
 }
 
-func (m *Meta) Load(path string) error {
+func (m *Meta) load(path string) error {
 	if m.MetaInfo == nil {
 		m.MetaInfo = make(map[string]MetaInfo)
-	}
-	if m.mu == nil {
-		m.mu = &sync.Mutex{}
 	}
 	metaFile := filepath.Join(path, KFS)
 	b, err := os.ReadFile(metaFile)
@@ -66,6 +73,7 @@ func (m *Meta) Load(path string) error {
 		log.Println(err.Error())
 		return err
 	}
+	// log.Println("Loading meta file:", string(b), GetCallerFunctionName(1), GetCallerFunctionName(0))
 	err = json.Unmarshal(b, m)
 	if err != nil {
 		log.Println(err.Error())
@@ -105,8 +113,8 @@ func (m *Meta) Merge(m2 *Meta) *Meta {
 }
 
 func (m *Meta) Get(name string) (MetaInfo, bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	val, ok := m.MetaInfo[name]
 	if val.Context == nil {
 		val.Context = make(map[string]interface{})
@@ -131,6 +139,8 @@ func (m *Meta) Del(name string) {
 }
 
 func (m *Meta) Write() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	metaFile := filepath.Join(m.Root, KFS)
 	for _, info := range m.MetaInfo {
 		sort.Strings(info.Tags)
@@ -141,7 +151,13 @@ func (m *Meta) Write() error {
 		log.Println(err.Error())
 		return err
 	}
-	return os.WriteFile(metaFile, b, 0644)
+	err = os.WriteFile(metaFile, b, 0644)
+	if err != nil {
+		log.Println(err.Error())
+		return err
+	}
+	// log.Println("Writing meta file:", string(b))
+	return nil
 }
 
 type MetaInfo struct {

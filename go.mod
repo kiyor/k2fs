@@ -18,25 +18,25 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/yosssi/gohtml v0.0.0-20201013000340-ee4748c638f4
 	golang.org/x/net v0.24.0
-	xorm.io/xorm v1.3.9
+	gorm.io/datatypes v1.2.0
+	gorm.io/driver/sqlite v1.5.5
+	gorm.io/gorm v1.25.10
 )
 
 require (
 	github.com/go-ole/go-ole v1.3.0 // indirect
-	github.com/goccy/go-json v0.10.2 // indirect
-	github.com/golang/snappy v0.0.4 // indirect
+	github.com/go-sql-driver/mysql v1.7.0 // indirect
 	github.com/gorilla/securecookie v1.1.2 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
-	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
-	github.com/modern-go/reflect2 v1.0.2 // indirect
+	github.com/jinzhu/inflection v1.0.0 // indirect
+	github.com/jinzhu/now v1.1.5 // indirect
+	github.com/microsoft/go-mssqldb v1.6.0 // indirect
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7 // indirect
-	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 	golang.org/x/image v0.15.0 // indirect
 	golang.org/x/sys v0.19.0 // indirect
-	xorm.io/builder v0.3.13 // indirect
+	gorm.io/driver/mysql v1.4.7 // indirect
 )

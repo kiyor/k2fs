@@ -1,16 +1,15 @@
-FROM golang:1.22 as builder
-WORKDIR /go/src/k2fs
-COPY vendor ./vendor
-COPY lib ./lib
-COPY pkg ./pkg
-COPY go.mod go.mod
-COPY go.sum go.sum
-#COPY app.js app.js
-COPY *.go ./
-COPY *.html ./
-COPY *.js ./
-COPY *.css ./
-RUN go build -mod vendor -a -installsuffix cgo -o k2fs .
+#FROM golang:1.22 as builder
+#WORKDIR /go/src/k2fs
+#COPY vendor ./vendor
+#COPY lib ./lib
+#COPY pkg ./pkg
+#COPY go.mod go.mod
+#COPY go.sum go.sum
+#COPY *.go ./
+#COPY *.html ./
+#COPY *.js ./
+#COPY *.css ./
+#RUN go build -mod vendor -a -installsuffix cgo -o k2fs .
 
 #FROM alpine:3.3
 #RUN apk update && apk add ca-certificates su-exec unzip unrar tzdata && rm -rf /var/cache/apk/*
@@ -34,7 +33,8 @@ ENV LANG en_US.UTF-8
 ENV LANGUAGE en_US:en
 ENV LC_ALL en_US.UTF-8
 WORKDIR /bin
-COPY --from=builder /go/src/k2fs/k2fs .
+#COPY --from=builder /go/src/k2fs/k2fs .
+COPY ./k2fs .
 COPY conv .
 COPY local local
 EXPOSE 8080

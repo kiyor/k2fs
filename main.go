@@ -133,7 +133,10 @@ func main() {
 			metaV2.RemoveOrphan()
 			log.Println("remove orphan done", time.Since(t2))
 			t3 := time.Now()
-			metaV2.CacheSize()
+			err := metaV2.CacheSize()
+			if err != nil {
+				log.Println(err)
+			}
 			log.Println("cache size done", time.Since(t3))
 			time.Sleep(55 * time.Minute)
 		}

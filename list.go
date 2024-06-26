@@ -313,13 +313,18 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 		// time.Sleep(200 * time.Millisecond)
 
 		//TODO optimize search/filter, do before some action like size()
+		var meta *kfs.Meta
+		kp := filepath.Join(rootDir, path)
+		// log.Println(kp)
+		meta = kfs.NewMeta(kp)
 		for p, f := range list {
 			nf := NewFile(f.Name())
 			nf.Hash = hash(filepath.Join(abs, f.Name()))
+			pathID := filepath.Join(path, f.Name())
 			if isRead {
 				// fullPath := filepath.Join(abs, f.Name())
 				// nf.Size, err = dirSize(fullPath)
-				nf.Size, err = dirSize2(filepath.Join(path, f.Name()))
+				nf.Size, err = dirSize2(pathID)
 				if err != nil {
 					log.Println(err)
 				}
@@ -337,8 +342,7 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 			} else {
 				nf.IsImage = isImage(nf.Path)
 			}
-			d, _ := filepath.Split(nf.Path)
-			meta := kfs.NewMeta(filepath.Join(rootDir, d))
+			// d, _ := filepath.Split(nf.Path)
 			// meta2 := kfs.NewMetaV2(rootDir)
 			if m, ok := meta.Get(nf.Name); ok {
 				nf.Meta = m
@@ -438,7 +442,7 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 		}
 		// query thumb start
 		client := retryablehttp.NewClient()
-		client.HTTPClient.Timeout = 2 * time.Second
+		client.HTTPClient.Timeout = time.Second
 		// 		client := &http.Client{
 		// 			Timeout: 2 * time.Second,
 		// 		}
@@ -454,6 +458,7 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 			v := _v
 			fc := func() error {
 				name := strings.TrimRight(v.Name, "/")
+				pathID := filepath.Join(strings.Trim(path, "/"), name)
 				name = filepath.Base(name)
 				found := false
 				if name, b := isAV(name); b {
@@ -469,7 +474,7 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 						if jr.Data.UserData.Score == 5 {
 							v.Description += `🔥`
 						}
-						for i := 0; i < jr.Data.UserData.FavourCount; i++ {
+						if jr.Data.UserData.Score == 4 {
 							v.Description += `👍`
 						}
 						v.Description += jr.Data.Title
@@ -534,7 +539,7 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 						if jr.Data.UserData.Score == 5 {
 							v.Description += `🔥`
 						}
-						for i := 0; i < jr.Data.UserData.FavourCount; i++ {
+						if jr.Data.UserData.Score == 4 {
 							v.Description += `👍`
 						}
 						v.Description += jr.Data.Title
@@ -578,31 +583,13 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 					}
 					// 					log.Println(name, jr.Data.ID)
 				}
-				if name, b := isSearchable(name); !found && b {
-					// log.Println("SEARCH", name)
-					key := "search:" + name
+				if _, b := isSearchable(name); !found && b {
+					key := "title:" + pathID
+					// log.Println(key)
 					if val, err := lib.Cache.Get(key); err == nil {
 						v.Description = `❗` + val.(string)
 					} else {
-						if val, err := metaV2.Get(v.Path); err == nil {
-							if val.Context["Title"] != nil {
-								v.Description = `❗` + val.Context["Title"].(string)
-								lib.Cache.SetWithExpire(key, val.Context["Title"].(string), 24*time.Hour)
-							} else {
-								res, err := lib.NewSearchClient().Search(name)
-								if err == nil {
-									v.Description = `❗` + res.Title
-									if val.Context == nil {
-										val.Context = make(map[string]interface{})
-									}
-									val.Context["Title"] = res.Title
-									metaV2.Set(val)
-									lib.Cache.SetWithExpire(key, res.Title, 24*time.Hour)
-								} else {
-									log.Println(err)
-								}
-							}
-						}
+						fetchTitle(pathID)
 					}
 				}
 				return nil

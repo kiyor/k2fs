@@ -199,6 +199,7 @@ func fetchTitle(path string) (string, error) {
 	return "", nil
 }
 
+// size by read database
 func dirSize2(path string) (int64, error) {
 	path = strings.TrimLeft(path, "/")
 	key := "size:" + path
@@ -225,6 +226,7 @@ func dirSize2(path string) (int64, error) {
 	return 1, nil
 }
 
+// size by read disk
 func dirSize(path string) (int64, error) {
 	key := "size:" + path
 	if val, err := lib.Cache.Get(key); err == nil {

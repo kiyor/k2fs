@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -21,9 +22,78 @@ import (
 
 var Cache = gcache.New(20000).LRU().Build()
 
+func (m *MetaV2) dbOrgPath() string {
+	return filepath.Join(m.root, ".kfs.db")
+}
+
+func (m *MetaV2) dbAllOrgPath() []string {
+	return []string{
+		m.dbOrgPath(),
+		m.dbOrgPath() + "-shm",
+		m.dbOrgPath() + "-wal",
+	}
+}
+
+func (m *MetaV2) dbPath() string {
+	if _, err := os.Stat(m.dbDir); os.IsNotExist(err) {
+		err = os.MkdirAll(m.dbDir, 0755)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	if m.dbDir == m.root {
+		return filepath.Join(m.dbDir, ".kfs.db")
+	}
+	return filepath.Join(m.dbDir, "kfs.db")
+}
+
+func (m *MetaV2) dbAllPath() []string {
+	return []string{
+		m.dbPath(),
+		m.dbPath() + "-shm",
+		m.dbPath() + "-wal",
+	}
+}
+
+func (m *MetaV2) dbMigrate() {
+	for k, v := range m.dbAllOrgPath() {
+		_, err := os.Stat(v)
+		if err == nil {
+			p := m.dbAllPath()[k]
+			f, err := os.Create(p)
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer f.Close()
+			o, err := os.Open(v)
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer o.Close()
+			_, err = io.Copy(f, o)
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Println("migrate", v, "->", p)
+		}
+	}
+}
+
 func (m *MetaV2) db() *gorm.DB {
 	if m.DB == nil {
-		path := filepath.Join(m.Root, ".kfs.db?cache=shared&_mutex=full")
+		if m.dbPath() != m.dbOrgPath() {
+			if _, err := os.Stat(m.dbPath()); err != nil { // new db not exist
+				log.Println("db not exist, try get db from org")
+				if _, err := os.Stat(m.dbOrgPath()); err != nil { // old db not exist
+					log.Println("db not exist, create new db")
+				} else {
+					m.dbMigrate()
+				}
+			}
+		}
+
+		path := m.dbPath() + "?cache=shared&_mutex=full"
+		log.Println("db path", path)
 		mod := logger.Silent
 		showSQL, _ := strconv.ParseBool(os.Getenv("SHOW_SQL"))
 		if showSQL {
@@ -71,12 +141,14 @@ func (m *MetaV2) init() error {
 
 type MetaV2 struct {
 	*gorm.DB
-	Root string
+	root  string
+	dbDir string
 }
 
-func NewMetaV2(root string) *MetaV2 {
+func NewMetaV2(root, dbDir string) *MetaV2 {
 	m := MetaV2{
-		Root: root,
+		root:  root,
+		dbDir: dbDir,
 	}
 	err := m.init()
 	if err != nil {
@@ -86,7 +158,7 @@ func NewMetaV2(root string) *MetaV2 {
 }
 
 func (m *MetaV2) LoadPath(relPath string) (*MetaInfoV2, error) {
-	info, err := os.Stat(filepath.Join(m.Root, relPath))
+	info, err := os.Stat(filepath.Join(m.root, relPath))
 	if err != nil {
 		return nil, err
 	}
@@ -122,6 +194,9 @@ func (m *MetaV2) MoveDir(srcDir, dstDir string) error {
 }
 
 func (m *MetaV2) NewInfo(path string, info os.FileInfo) (*MetaInfoV2, bool, error) {
+	if info == nil {
+		return nil, false, errors.New("file not exist")
+	}
 	path = strings.TrimLeft(path, "/")
 	i, err := m.Get(path)
 	if err != nil {
@@ -236,8 +311,8 @@ func (m *MetaV2) Index(prefixs ...string) error {
 	}
 	for _, prefix := range prefixs {
 		prefix = strings.TrimLeft(prefix, "/")
-		err := filepath.Walk(filepath.Join(m.Root, prefix), func(path string, info os.FileInfo, err error) error {
-			path, err = filepath.Rel(m.Root, path)
+		err := filepath.Walk(filepath.Join(m.root, prefix), func(path string, info os.FileInfo, err error) error {
+			path, err = filepath.Rel(m.root, path)
 			if err != nil {
 				return err
 			}
@@ -259,8 +334,8 @@ func (m *MetaV2) IndexDynamicly(prefixs ...string) error {
 	var recheck bool
 	for _, prefix := range prefixs {
 		prefix = strings.TrimLeft(prefix, "/")
-		err := filepath.Walk(filepath.Join(m.Root, prefix), func(path string, info os.FileInfo, err error) error {
-			path, err = filepath.Rel(m.Root, path)
+		err := filepath.Walk(filepath.Join(m.root, prefix), func(path string, info os.FileInfo, err error) error {
+			path, err = filepath.Rel(m.root, path)
 			if err != nil {
 				return err
 			}
@@ -295,7 +370,7 @@ func (m *MetaV2) RemoveOrphan(prefixs ...string) error {
 			return err
 		}
 		for _, i := range is {
-			if _, err := os.Stat(filepath.Join(m.Root, i.Path)); err != nil {
+			if _, err := os.Stat(filepath.Join(m.root, i.Path)); err != nil {
 				m.Del(i.Path)
 			}
 		}

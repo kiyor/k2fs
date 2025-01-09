@@ -22,6 +22,18 @@ type Operation struct {
 	Action string          `json:"action"`
 }
 
+func (o *Operation) ActionKey() string {
+	return strings.Split(o.Action, "=")[0]
+}
+
+func (o *Operation) ActionValue() string {
+	s := strings.Split(o.Action, "=")
+	if len(s) > 1 {
+		return s[1]
+	}
+	return ""
+}
+
 var Trash string
 var opMutex *sync.Mutex = new(sync.Mutex)
 
@@ -90,6 +102,20 @@ func apiOperation(w http.ResponseWriter, r *http.Request) {
 				}
 				meta.Set(k, m)
 				m2.SetLabel(m.Label)
+			case strings.HasPrefix(op.Action, "mark"):
+				switch op.ActionValue() {
+				case "5":
+					m2.SetLabel("danger")
+					m2.SetStar(true)
+					m.Label = "danger"
+					m.Star = true
+					meta.Set(k, m)
+				case "4":
+					m2.SetLabel("danger")
+					m.Label = "danger"
+					meta.Set(k, m)
+				default:
+				}
 			case strings.HasPrefix(op.Action, "icons"):
 				to := strings.Split(op.Action, "=")
 				m.Icons = []string{}
@@ -131,12 +157,12 @@ func apiOperation(w http.ResponseWriter, r *http.Request) {
 					fs, _ := os.ReadDir(Trash)
 					for _, v := range fs {
 						f := filepath.Join(Trash, v.Name())
-						log.Println("rm -rf", f)
-						os.RemoveAll(f)
+						err := os.RemoveAll(f)
+						log.Println("rm -rf", f, err)
 					}
 				} else if strings.HasPrefix(file, Trash) { // file inside trash, delete single file
-					log.Println("rm -rf", file)
-					os.RemoveAll(file)
+					err := os.RemoveAll(file)
+					log.Println("rm -rf", file, err)
 					meta.Del(k)
 					// 					trashMeta.Write()
 				} else { // not inside trash

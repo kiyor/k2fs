@@ -29,9 +29,9 @@ RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
 ADD https://github.com/tianon/gosu/releases/download/1.14/gosu-amd64 /usr/local/bin/su-exec
 RUN chmod +x /usr/local/bin/su-exec
 
-ENV LANG en_US.UTF-8
-ENV LANGUAGE en_US:en
-ENV LC_ALL en_US.UTF-8
+ENV LANG=en_US.UTF-8
+ENV LANGUAGE=en_US:en
+ENV LC_ALL=en_US.UTF-8
 WORKDIR /bin
 #COPY --from=builder /go/src/k2fs/k2fs .
 COPY ./k2fs .

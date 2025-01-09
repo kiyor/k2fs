@@ -155,19 +155,23 @@ const myapp = {
                 this.operation("delete");
             }
             if (event.key === '4') {
-                this.operation('label=danger');
+                this.operation('mark=4');
             }
             if (event.key === '5') {
                 let s = this.select;
                 let p = this.path;
-                this.operation('label=danger');
+                this.operation('mark=5');
                 this.select = s;
                 this.path = p;
-                this.operation('star');
             }
             if (event.key === 's') {
                 this.select[this.hoveredFile] = !this.select[this.hoveredFile];
                 _show();
+            }
+            if (event.key === 'r') {
+                this.select = {};
+                this.listApi();
+                this.getDf();
             }
         });
         //     console.log(this.history); 
@@ -364,8 +368,8 @@ const myapp = {
                 .then(response => {
                     console.log(response.data);
                     this.select = {};
-                    this.listApi();
-                    this.getDf();
+                    // this.listApi(); disable for test performance
+                    // this.getDf();
                     _hide();
                 })
                 .catch(error => {

@@ -14,7 +14,6 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.5
 	github.com/kiyor/golib v0.0.2
 	github.com/kiyor/terminal v1.0.0
-	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/yosssi/gohtml v0.0.0-20201013000340-ee4748c638f4
 	golang.org/x/net v0.24.0
@@ -32,6 +31,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
+	github.com/mattn/go-sqlite3 v1.14.22 // indirect
 	github.com/microsoft/go-mssqldb v1.6.0 // indirect
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect

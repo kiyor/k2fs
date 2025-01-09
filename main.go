@@ -21,11 +21,12 @@ import (
 )
 
 var (
-	addr     string
-	rootDir  string
-	intf     string
-	port     string
-	flagHost string
+	addr               string
+	rootDir, dbDir     string
+	intf               string
+	port               string
+	flagHost           string
+	flagStaticFileHost string
 
 	//go:embed tmpl.html
 	basicView string
@@ -49,8 +50,10 @@ func init() {
 	flag.StringVar(&intf, "i", "0.0.0.0", "http service interface address")
 	flag.StringVar(&port, "l", ":8080", "http service listen port")
 	flag.StringVar(&rootDir, "root", ".", "root dir")
+	flag.StringVar(&dbDir, "db", ".", "db dir")
 	flag.StringVar(&flagHost, "host", "", "host if need overwrite; syntax like http://a.com(:8080)")
-	flag.StringVar(&metaHost, "meta", "192.168.10.31", "meta host")
+	flag.StringVar(&flagStaticFileHost, "static", "", "static file host like http://a.com(:8080)")
+	flag.StringVar(&metaHost, "meta", "10.43.62.113", "meta host")
 	flag.Var(&flagDf, "df", "monitor mount dir")
 }
 
@@ -72,6 +75,7 @@ func req2map(r *http.Request) map[string]interface{} {
 	m["host"] = u
 	m["ios"] = reIpad.MatchString(r.Header.Get("User-Agent"))
 	m["phone"] = rePhone.MatchString(r.Header.Get("User-Agent"))
+	m["metahost"] = metaHost
 	// 	log.Println("ios:", m["ios"])
 	return m
 }
@@ -113,7 +117,10 @@ func main() {
 	if rootDir == "." {
 		rootDir, _ = os.Getwd()
 	}
-	metaV2 = lib.NewMetaV2(rootDir)
+	if dbDir == "." {
+		dbDir = rootDir
+	}
+	metaV2 = lib.NewMetaV2(rootDir, dbDir)
 	// cache = gcache.New(cacheMax).LRU().Build()
 	addr = intf + port
 	Trash = filepath.Join(rootDir, ".Trash")
@@ -165,7 +172,7 @@ func main() {
 		w.Header().Add("cache-control", "public, max-age=300")
 		w.Write([]byte(bootstrapcss))
 	})
-	fileServer := myhttp.FileServer(myhttp.Dir(rootDir))
+	fileServerMain := myhttp.FileServer(myhttp.Dir(rootDir))
 	local := http.FileServer(http.Dir("./local"))
 
 	davHandler := &webdav.Handler{
@@ -175,7 +182,7 @@ func main() {
 	}
 
 	r.PathPrefix("/api").HandlerFunc(api)
-	r.PathPrefix("/statics").Handler(http.StripPrefix("/statics", fileServer))
+	r.PathPrefix("/statics").Handler(http.StripPrefix("/statics", fileServerMain))
 	r.PathPrefix("/.local").Handler(http.StripPrefix("/.local", local))
 	r.PathPrefix("/photo").HandlerFunc(renderPhoto)
 	r.PathPrefix("/webdav").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -190,7 +197,12 @@ func main() {
 	r.PathPrefix("/s").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		path = strings.TrimPrefix(path, "/s/")
+		shortMu.Lock()
+		defer shortMu.Unlock()
 		if short, ok := shortUrl[path]; ok {
+			if len(flagStaticFileHost) > 0 {
+				short = flagStaticFileHost + short
+			}
 			http.Redirect(w, r, short, http.StatusFound)
 		} else {
 			http.NotFound(w, r)

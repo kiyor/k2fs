@@ -162,7 +162,7 @@
                                 v-bind:id="file.Name">
                                 <td>
                                     <a v-bind:id="'icon_'+file.Hash"
-                                        v-bind:href="'http://192.168.10.31/home#!?q=' + file.Name" target="_blank">
+                                        v-bind:href="'http://[[.metahost]]/home#!?q=' + file.Name" target="_blank">
                                         <!--                   <a v-bind:id="'icon_'+file.Hash" v-bind:href="file.ThumbLink" target="_blank"> -->
                                         <img v-if="file.ThumbLink" :src="file.ThumbLink" loading="lazy"
                                             width="[[if .phone]]60[[else]]240[[end]]"></img>

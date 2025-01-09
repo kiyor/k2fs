@@ -630,12 +630,12 @@ func serveFile(w http.ResponseWriter, r *http.Request, fs FileSystem, name strin
 			fn := filepath.Join(dirn, fmt.Sprintf("%s_%d%s", s[3:], maxWidth, ext))
 			if f, err = os.Open(fn); err == nil {
 				defer f.Close()
-				log.Println("HIT", fn)
+				// log.Println("HIT", fn)
 				goto GOT
 			} else {
 				log.Println(err)
 			}
-			log.Println("MISS", fn)
+			// log.Println("MISS", fn)
 
 			if reader, err := fs.Open(name); err == nil {
 				defer reader.Close()

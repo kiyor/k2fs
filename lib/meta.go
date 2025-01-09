@@ -48,7 +48,9 @@ func NewMeta(path string) *Meta {
 		MetaInfo: make(map[string]MetaInfo),
 		mu:       locker[path],
 	}
-	defer m.mu.Unlock()
+	defer func(path string) {
+		m.mu.Unlock()
+	}(path)
 
 	err := m.load(path)
 	if err != nil {
@@ -60,7 +62,10 @@ func NewMeta(path string) *Meta {
 func (m *Meta) init(path string) {
 	m.Root = path
 	b, _ := json.MarshalIndent(m, "", "  ")
-	os.WriteFile(filepath.Join(m.Root, KFS), b, 0644)
+	err := os.WriteFile(filepath.Join(m.Root, KFS), b, 0644)
+	if err != nil {
+		log.Println(err.Error())
+	}
 }
 
 func (m *Meta) load(path string) error {
@@ -73,7 +78,6 @@ func (m *Meta) load(path string) error {
 		log.Println(err.Error())
 		return err
 	}
-	// log.Println("Loading meta file:", string(b), GetCallerFunctionName(1), GetCallerFunctionName(0))
 	err = json.Unmarshal(b, m)
 	if err != nil {
 		log.Println(err.Error())
@@ -81,7 +85,7 @@ func (m *Meta) load(path string) error {
 	}
 	if path != m.Root {
 		m.Root = path
-		m.Write()
+		m.write()
 	}
 	return nil
 }
@@ -136,6 +140,25 @@ func (m *Meta) Del(name string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	delete(m.MetaInfo, name)
+}
+
+func (m *Meta) write() error {
+	metaFile := filepath.Join(m.Root, KFS)
+	for _, info := range m.MetaInfo {
+		sort.Strings(info.Tags)
+		sort.Strings(info.Icons)
+	}
+	b, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		log.Println(err.Error())
+		return err
+	}
+	err = os.WriteFile(metaFile, b, 0644)
+	if err != nil {
+		log.Println(err.Error())
+		return err
+	}
+	return nil
 }
 
 func (m *Meta) Write() error {

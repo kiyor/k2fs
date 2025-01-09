@@ -20,6 +20,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dustin/go-humanize"
@@ -47,6 +48,9 @@ var hideContain = []string{
 	"padding_file",
 	".DS_Store",
 	".kfs.db",
+}
+var hideRe = []*regexp.Regexp{
+	regexp.MustCompile(`^\.nfs[\w]{24}`),
 }
 var videoExt = []string{
 	".mp4",
@@ -109,6 +113,11 @@ func needHide(path string) bool {
 	}
 	for _, v := range hideContain {
 		if strings.Contains(path, v) {
+			return true
+		}
+	}
+	for _, v := range hideRe {
+		if v.MatchString(filepath.Base(path)) {
 			return true
 		}
 	}
@@ -228,6 +237,7 @@ func isImage(path string) bool {
 
 func apiList(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
+	// log.Println(r.Method, r.URL.Path)
 	args := make(map[string]string)
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -315,8 +325,8 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 		//TODO optimize search/filter, do before some action like size()
 		var meta *kfs.Meta
 		kp := filepath.Join(rootDir, path)
-		// log.Println(kp)
 		meta = kfs.NewMeta(kp)
+		replacer := strings.NewReplacer("+", "%20", "#", "%23")
 		for p, f := range list {
 			nf := NewFile(f.Name())
 			nf.Hash = hash(filepath.Join(abs, f.Name()))
@@ -342,23 +352,10 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 			} else {
 				nf.IsImage = isImage(nf.Path)
 			}
-			// d, _ := filepath.Split(nf.Path)
-			// meta2 := kfs.NewMetaV2(rootDir)
 			if m, ok := meta.Get(nf.Name); ok {
 				nf.Meta = m
-				// meta2.Set(&kfs.MetaInfoV2{
-				// 	Path:    nf.Path,
-				// 	Size:    nf.Size,
-				// 	ModTime: nf.ModTime,
-				// 	Label:   m.Label,
-				// 	Tags:    m.Tags,
-				// 	Star:    m.Star,
-				// })
-				// log.Println(nf.Path)
 			}
-			// 			fp := filepath.Join("/statics", path, f.Name())
 			fp := filepath.Join("/statics", p)
-			replacer := strings.NewReplacer("+", "%20", "#", "%23")
 			host := "http://" + r.Host
 			if len(flagHost) > 0 {
 				host = flagHost
@@ -366,7 +363,6 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 			b64md5fp := enc(fp)
 			if isVideo(nf.Name) {
 				qv := url.Values{}
-				// qv["url"] = []string{host + fp}
 				qv["url"] = []string{host + "/s/" + b64md5fp}
 				q := replacer.Replace(qv.Encode())
 				switch {
@@ -404,7 +400,6 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 		}
 		if sortby, ok := session.Values["sortby"]; ok {
 			s := sortby.([]string)
-			// log.Println("sortby", s[0], "desc", desc)
 			switch s[0] {
 			case "name":
 				sort.Slice(dir.Files, func(i, j int) bool {
@@ -440,19 +435,15 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 				return b
 			})
 		}
-		// query thumb start
 		client := retryablehttp.NewClient()
-		client.HTTPClient.Timeout = time.Second
-		// 		client := &http.Client{
-		// 			Timeout: 2 * time.Second,
-		// 		}
+		client.HTTPClient.Timeout = 2 * time.Second
+		client.RetryMax = 2
+		client.RetryWaitMax = 10 * time.Second
 
 		var tasks []golib.Task
 		var cdn bool
 
-		// 		if !isPhone(r) {
 		cdn = true
-		// 		}
 
 		for _, _v := range dir.Files {
 			v := _v
@@ -481,6 +472,7 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 						v.ThumbLink = jr.Data.BackupCover
 						// tags
 						m := make(map[string]bool)
+						m[name2series(name)] = true
 						for _, t := range jr.Data.Tags {
 							m[t] = true
 						}
@@ -546,6 +538,7 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 						v.ThumbLink = jr.Data.BackupCover
 						// tags
 						m := make(map[string]bool)
+						m[name2series(name)] = true
 						for _, t := range jr.Data.Tags {
 							m[t] = true
 						}
@@ -575,17 +568,14 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 							tags = append(tags, k)
 						}
 						v.Tags = sort.StringSlice(tags)
-						//
-						log.Println(name, "MISS")
+						// log.Println(name, "MISS")
 						if jr.Data.ID > 0 {
 							found = true
 						}
 					}
-					// 					log.Println(name, jr.Data.ID)
 				}
 				if _, b := isSearchable(name); !found && b {
 					key := "title:" + pathID
-					// log.Println(key)
 					if val, err := lib.Cache.Get(key); err == nil {
 						v.Description = `❗` + val.(string)
 					} else {
@@ -690,6 +680,7 @@ var (
 		regexp.MustCompile(`^\d{3}[A-Z]+\-\d+$`),
 		regexp.MustCompile(`^KIN8\-\d+$`),
 		regexp.MustCompile(`^T28\-\d+$`),
+		regexp.MustCompile(`^ID\-\d+$`),
 		regexp.MustCompile(`^\d+\-\d+\-CARIB$`),
 	}
 	reSearchable = []*regexp.Regexp{
@@ -725,6 +716,9 @@ func isAV(name string) (string, bool) {
 			return name, true
 		}
 	}
+	if strings.HasSuffix(name, "-C") {
+		name = strings.TrimRight(name, "-C")
+	}
 	if strings.HasPrefix(name, "FC2-PPV") {
 		return strings.Split(name, ".")[0], true
 	}
@@ -739,6 +733,10 @@ func isAV(name string) (string, bool) {
 		}
 	}
 	return name, false
+}
+
+func name2series(name string) string {
+	return strings.Split(name, "-")[0]
 }
 
 func filePathWalkDir(root string, isDir bool) ([]string, error) {
@@ -786,10 +784,13 @@ func slice2fileinfo(s []string, prefix string) (map[string]os.FileInfo, error) {
 }
 
 var shortUrl = make(map[string]string)
+var shortMu = sync.Mutex{}
 
 func enc(s string) string {
 	v := md5Encode(base64Encode(s))
+	shortMu.Lock()
 	shortUrl[v] = s
+	shortMu.Unlock()
 	// log.Println(v, s)
 	return v
 }

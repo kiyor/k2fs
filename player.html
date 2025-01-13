@@ -48,6 +48,36 @@ video {
     left: 20px;
 }
 
+#time-box {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 10px;
+    border-radius: 5px;
+    color: white;
+    display: none;
+    text-align: center;
+    min-width: 120px;
+}
+
+#time-box-progress {
+    width: 100%;
+    height: 3px;
+    background-color: rgba(255, 255, 255, 0.3);
+    margin-top: 8px;
+    border-radius: 1.5px;
+    overflow: hidden;
+}
+
+#time-box-progress-bar {
+    height: 100%;
+    background-color: #ff0000;
+    width: 0%;
+    transition: width 0.1s linear;
+}
+
 </style>
 </head>
 <body>
@@ -61,6 +91,12 @@ video {
     <div id="progress-tip" style="position: absolute; bottom: 20px; color: white; background-color: rgba(0, 0, 0, 0.7); padding: 5px;">00:00</div>
     <div id="volume-tip">Volume: 100%</div>
     <div id="brightness-tip">Brightness: 100%</div>
+    <div id="time-box">
+        <span id="time-text">00:00 / 00:00</span>
+        <div id="time-box-progress">
+            <div id="time-box-progress-bar"></div>
+        </div>
+    </div>
 </div>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -108,11 +144,15 @@ document.addEventListener('DOMContentLoaded', function() {
     let touchEndY = 0;
     const threshold = 10; // 死区阈值，可根据需要调整
 
+    const timeBox = document.getElementById('time-box');
+    const timeText = document.getElementById('time-text');
+    const timeBoxProgressBar = document.getElementById('time-box-progress-bar');
+
     video.addEventListener('touchstart', function(event) {
         touchStartX = touchEndX = event.changedTouches[0].screenX;
         touchStartY = touchEndY = event.changedTouches[0].screenY;
-        //progressBar.style.display = 'block'; // hide bar
-        progressTip.style.display = 'block';
+        timeBox.style.display = 'block';
+        updateTimeDisplay();
         volumeTip.style.display = 'block';
         brightnessTip.style.display = 'block';
     }, false);
@@ -131,8 +171,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Horizontal swipe: scrubbing
                 const newTime = video.currentTime + (deltaX / video.clientWidth) * video.duration;
                 video.currentTime = Math.max(0, Math.min(video.duration, newTime));
-                progressBar.style.width = `${(video.currentTime / video.duration) * 100}%`;
-                progressTip.innerHTML = formatTime(video.currentTime);
+                updateTimeDisplay();
             }
         } else {
             if (Math.abs(deltaY) > threshold) {
@@ -157,8 +196,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }, false);
 
     video.addEventListener('touchend', function(event) {
-        progressBar.style.display = 'none';
-        progressTip.style.display = 'none';
+        timeBox.style.display = 'none';
         volumeTip.style.display = 'none';
         brightnessTip.style.display = 'none';
     }, false);
@@ -167,6 +205,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const result = new Date(seconds * 1000).toISOString().substr(14, 5);
         return result;
     }
+
+    function updateTimeDisplay() {
+        const currentTime = formatTime(video.currentTime);
+        const totalTime = formatTime(video.duration);
+        timeText.textContent = `${currentTime} / ${totalTime}`;
+        const progress = (video.currentTime / video.duration) * 100;
+        timeBoxProgressBar.style.width = `${progress}%`;
+    }
+
+    progressBar.style.display = 'none';
+    progressTip.style.display = 'none';
 });
 </script>
 </body>

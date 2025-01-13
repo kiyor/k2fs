@@ -78,11 +78,22 @@ video {
     transition: width 0.1s linear;
 }
 
+/* 添加以下样式来隐藏原生控件 */
+video::-webkit-media-controls {
+    display: none !important;
+}
+video::-webkit-media-controls-enclosure {
+    display: none !important;
+}
+video::-webkit-media-controls-panel {
+    display: none !important;
+}
+
 </style>
 </head>
 <body>
 <div id="video-container">
-    <video id="video-player" autoplay controls>
+    <video id="video-player" autoplay>
         <source id="video-source">
         Your browser does not support the video tag.
     </video>
@@ -216,6 +227,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     progressBar.style.display = 'none';
     progressTip.style.display = 'none';
+
+    video.addEventListener('click', function() {
+        if (video.paused) {
+            video.play();
+        } else {
+            video.pause();
+        }
+    });
 });
 </script>
 </body>

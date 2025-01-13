@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mobile Video Player</title>
+<style>
+body, html {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    background-color: #000;
+}
+
+#video-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+video {
+    width: 100%;
+    height: 100%;
+}
+
+#progress-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 5px;
+    background-color: red;
+    width: 0%; /* 确保在未设置宽度前不显示 */
+}
+
+#volume-tip, #brightness-tip {
+    position: absolute;
+    color: white;
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 5px;
+    bottom: 50px; /* 提高提示信息的位置，避免被进度条覆盖 */
+}
+
+#volume-tip {
+    right: 20px;
+}
+
+#brightness-tip {
+    left: 20px;
+}
+
+</style>
+</head>
+<body>
+<div id="video-container">
+    <video id="video-player" autoplay controls>
+        <source id="video-source">
+        Your browser does not support the video tag.
+    </video>
+    <button id="play-button">Play Video</button>
+    <div id="progress-bar"></div>
+    <div id="progress-tip" style="position: absolute; bottom: 20px; color: white; background-color: rgba(0, 0, 0, 0.7); padding: 5px;">00:00</div>
+    <div id="volume-tip">Volume: 100%</div>
+    <div id="brightness-tip">Brightness: 100%</div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 解析URL查询字符串
+    const queryParams = new URLSearchParams(window.location.search);
+    const videoSrc = queryParams.get('url');  // 获取视频URL
+    const videoType = queryParams.get('type') || 'video/mp4';  // 获取视频类型，如果不存在则默认为video/mp4
+
+    // 设置视频源和类型
+    const videoSource = document.getElementById('video-source');
+    if (videoSrc) {
+        videoSource.setAttribute('src', videoSrc);
+        videoSource.setAttribute('type', videoType);
+        document.getElementById('video-player').load();  // 重新加载<video>元素以应用新的源
+    }
+
+    const playButton = document.getElementById('play-button');
+    playButton.addEventListener('click', function() {
+        video.play();
+    });
+
+    const video = document.getElementById('video-player');
+    const progressBar = document.getElementById('progress-bar');
+    const progressTip = document.getElementById('progress-tip');
+    const volumeTip = document.getElementById('volume-tip');
+    const brightnessTip = document.getElementById('brightness-tip');
+
+    // 初始化音量和亮度
+    const defaultVolume = 0.1; // 10%
+    const defaultBrightness = 1.0; // 100%
+
+    const savedVolume = parseFloat(localStorage.getItem('volume')) || defaultVolume;
+    const savedBrightness = parseFloat(localStorage.getItem('brightness')) || defaultBrightness;
+
+    video.volume = savedVolume;
+    volumeTip.innerHTML = `Volume: ${Math.round(savedVolume * 100)}%`;
+
+    brightnessTip.setAttribute('data-brightness', savedBrightness);
+    brightnessTip.innerHTML = `Brightness: ${Math.round(savedBrightness * 100)}%`;
+    video.style.filter = `brightness(${savedBrightness})`;
+
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchEndX = 0;
+    let touchEndY = 0;
+    const threshold = 10; // 死区阈值，可根据需要调整
+
+    video.addEventListener('touchstart', function(event) {
+        touchStartX = touchEndX = event.changedTouches[0].screenX;
+        touchStartY = touchEndY = event.changedTouches[0].screenY;
+        //progressBar.style.display = 'block'; // hide bar
+        progressTip.style.display = 'block';
+        volumeTip.style.display = 'block';
+        brightnessTip.style.display = 'block';
+    }, false);
+
+    video.addEventListener('touchmove', function(event) {
+        event.preventDefault(); // Prevent scrolling
+        const currentX = event.changedTouches[0].screenX;
+        const currentY = event.changedTouches[0].screenY;
+        const deltaX = currentX - touchEndX;
+        const deltaY = currentY - touchEndY;
+        touchEndX = currentX;
+        touchEndY = currentY;
+
+        if (Math.abs(deltaX) > Math.abs(deltaY)) {
+            if (Math.abs(deltaY) < threshold) {
+                // Horizontal swipe: scrubbing
+                const newTime = video.currentTime + (deltaX / video.clientWidth) * video.duration;
+                video.currentTime = Math.max(0, Math.min(video.duration, newTime));
+                progressBar.style.width = `${(video.currentTime / video.duration) * 100}%`;
+                progressTip.innerHTML = formatTime(video.currentTime);
+            }
+        } else {
+            if (Math.abs(deltaY) > threshold) {
+                // Vertical swipe: volume and brightness
+                if (touchStartX > video.clientWidth / 2) {
+                    // Right half for volume
+                    const volumeChange = deltaY / video.clientHeight;
+                    video.volume = Math.max(0, Math.min(1, video.volume - volumeChange));
+                    volumeTip.innerHTML = `Volume: ${Math.round(video.volume * 100)}%`;
+                    localStorage.setItem('volume', newVolume); // 保存到 localStorage
+                } else {
+                    // Left half for simulated brightness
+                    const brightnessChange = -deltaY / video.clientHeight;
+                    const newBrightness = Math.max(0, Math.min(1, parseFloat(brightnessTip.getAttribute('data-brightness') || 1) + brightnessChange));
+                    brightnessTip.setAttribute('data-brightness', newBrightness);
+                    brightnessTip.innerHTML = `Brightness: ${Math.round(newBrightness * 100)}%`;
+                    video.style.filter = `brightness(${newBrightness})`;
+                    localStorage.setItem('brightness', newBrightness); // 保存到 localStorage
+                }
+            }
+        }
+    }, false);
+
+    video.addEventListener('touchend', function(event) {
+        progressBar.style.display = 'none';
+        progressTip.style.display = 'none';
+        volumeTip.style.display = 'none';
+        brightnessTip.style.display = 'none';
+    }, false);
+
+    function formatTime(seconds) {
+        const result = new Date(seconds * 1000).toISOString().substr(14, 5);
+        return result;
+    }
+});
+</script>
+</body>
+</html>

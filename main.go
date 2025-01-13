@@ -60,6 +60,7 @@ func init() {
 var (
 	reIpad  = regexp.MustCompile(` Version/\d+\.\d+`)
 	rePhone = regexp.MustCompile(`(P|p)hone`)
+	reIos   = regexp.MustCompile(`\((iPhone|iPad);`)
 )
 
 func req2map(r *http.Request) map[string]interface{} {
@@ -73,7 +74,7 @@ func req2map(r *http.Request) map[string]interface{} {
 		u = flagHost
 	}
 	m["host"] = u
-	m["ios"] = reIpad.MatchString(r.Header.Get("User-Agent"))
+	m["ios"] = reIos.MatchString(r.Header.Get("User-Agent"))
 	m["phone"] = rePhone.MatchString(r.Header.Get("User-Agent"))
 	m["metahost"] = metaHost
 	// 	log.Println("ios:", m["ios"])
@@ -185,6 +186,7 @@ func main() {
 	r.PathPrefix("/statics").Handler(http.StripPrefix("/statics", fileServerMain))
 	r.PathPrefix("/.local").Handler(http.StripPrefix("/.local", local))
 	r.PathPrefix("/photo").HandlerFunc(renderPhoto)
+	r.Path("/player").HandlerFunc(renderPlayer)
 	r.PathPrefix("/webdav").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "OPTIONS" {
 			w.Header().Add("DAV", "1,2")

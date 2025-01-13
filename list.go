@@ -52,26 +52,33 @@ var hideContain = []string{
 var hideRe = []*regexp.Regexp{
 	regexp.MustCompile(`^\.nfs[\w]{24}`),
 }
-var videoExt = []string{
-	".mp4",
-	".mov",
-	".avi",
-	".wmv",
-	".mkv",
-	".ts",
-	".flv",
-	".mpg",
-	".dat",
+var videoExt = map[string]string{
+	".mp4": "video/mp4",
+	".mov": "video/quicktime",
+	".avi": "",
+	".wmv": "",
+	".mkv": "video/mp4",
+	".ts":  "video/MP2T",
+	".flv": "",
+	".mpg": "",
+	".dat": "",
 }
 
 func isVideo(file string) bool {
 	ext := strings.ToLower(filepath.Ext(file))
-	for _, v := range videoExt {
+	for v := range videoExt {
 		if v == ext {
 			return true
 		}
 	}
 	return false
+}
+func videoType(file string) string {
+	ext := strings.ToLower(filepath.Ext(file))
+	if v, ok := videoExt[ext]; ok {
+		return v
+	}
+	return ""
 }
 
 var (
@@ -100,6 +107,20 @@ func isWin(r *http.Request) bool {
 func isPhone(r *http.Request) bool {
 	ag := r.Header.Get("User-Agent")
 	if rePhone.MatchString(ag) {
+		return true
+	}
+	return false
+}
+func isSoul(r *http.Request) bool {
+	h := r.Header.Get("X-Requested-With")
+	if strings.Contains(h, "soul") {
+		return true
+	}
+	return false
+}
+func isIos(r *http.Request) bool {
+	ag := r.Header.Get("User-Agent")
+	if reIos.MatchString(ag) {
 		return true
 	}
 	return false
@@ -283,6 +304,8 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 		isRead = false
 		isSearch = true
 	}
+	openWith := args["openWith"]
+	log.Println("openWith", openWith)
 	session, err := store.Get(r, APP)
 	if err != nil {
 		log.Println(err)
@@ -364,16 +387,43 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 			if isVideo(nf.Name) {
 				qv := url.Values{}
 				qv["url"] = []string{host + "/s/" + b64md5fp}
+				t := videoType(nf.Name)
+				if len(t) > 0 {
+					qv["type"] = []string{t}
+				}
 				q := replacer.Replace(qv.Encode())
-				switch {
-				case isMac(r):
+				/*
+					switch {
+					case isMac(r):
+						nf.ShortCut = "iina://open?" + q
+					case isIos(r):
+						// nf.ShortCut = host + replacer.Replace(fp)
+						// nf.ShortCut = "vlc://" + host + fp //vlc
+						nf.ShortCut = "nplayer-" + host + replacer.Replace(fp) //nplayer
+						// nf.ShortCut = "infuse://x-callback-url/play?" + q      //infuse
+
+					case isWin(r):
+						nf.ShortCut = host + replacer.Replace(fp)
+					case isSoul(r):
+						nf.ShortCut = host + replacer.Replace(fp)
+					default:
+						// nf.ShortCut = "http://192.168.10.31/player?" + q
+						// nf.ShortCut = "/player?" + q
+						nf.ShortCut = "nplayer-" + host + replacer.Replace(fp) //nplayer
+						//nf.ShortCut = host + replacer.Replace(fp)
+					}
+				*/
+				switch openWith {
+				case "iina":
 					nf.ShortCut = "iina://open?" + q
-					// 				case isPhone(r):
-					// 					nf.ShortCut = "iina://open?" + q
-				case isWin(r):
-					nf.ShortCut = host + replacer.Replace(fp)
+				case "nplayer":
+					nf.ShortCut = "nplayer-" + host + replacer.Replace(fp) //nplayer
+				case "vlc":
+					nf.ShortCut = "vlc://" + host + replacer.Replace(fp) //vlc
+				case "browser":
+					nf.ShortCut = "/player?" + q
 				default:
-					nf.ShortCut = host + replacer.Replace(fp)
+					nf.ShortCut = "/player?" + q
 				}
 			} else {
 				nf.ShortCut = host + replacer.Replace(fp)
@@ -693,6 +743,7 @@ var (
 		"-C_GG5", "",
 		"[MD]", "",
 	)
+	suffixTrimList = []string{"ch", "-C"}
 )
 
 func isSearchable(name string) (string, bool) {
@@ -716,8 +767,10 @@ func isAV(name string) (string, bool) {
 			return name, true
 		}
 	}
-	if strings.HasSuffix(name, "-C") {
-		name = strings.TrimRight(name, "-C")
+	for _, v := range suffixTrimList {
+		if strings.HasSuffix(name, v) {
+			name = strings.TrimRight(name, v)
+		}
 	}
 	if strings.HasPrefix(name, "FC2-PPV") {
 		return strings.Split(name, ".")[0], true

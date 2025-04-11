@@ -94,12 +94,16 @@
                         <h1> &lt; </h1>
                     </a>
                 </div>
-                <div class="col-5">
+                <div class="col-3">
                     <h1>{{dir}}</h1>
                 </div>
                 <div class="col-2">
                     <a target="_blank" v-bind:href="'/photo/' + path"><button type="button"
                             class="btn btn-outline-dark">PhotoGen</button></a>
+                </div>
+                <div class="col-2">
+                    <a target="_blank" href="/debug/pprof/"><button type="button"
+                            class="btn btn-outline-dark">debug</button></a>
                 </div>
             </div>
         </div>
@@ -132,6 +136,12 @@
             <div>
                 <div class="row">
                     <div class="col-auto">
+                        <label class="col-form-label">Local</label>
+                    </div>
+                    <div class="col-auto">
+                        <input type="checkbox" v-model="localStore" @change="changeLocalStore(localStore)">
+                    </div>
+                    <div class="col-auto">
                         <label class="col-form-label">Open With</label>
                     </div>
                     <div class="col-auto">
@@ -139,6 +149,9 @@
                             <option value="iina">iina</option>
                             <option value="nplayer">nplayer</option>
                             <option value="vlc">vlc</option>
+                            <option value="potplayer">potplayer</option>
+                            <option value="mxplayer">mxplayer</option>
+                            <option value="native">native</option>
                             <option value="browser">browser</option>
                         </select>
                     </div>

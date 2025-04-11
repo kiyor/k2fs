@@ -23,21 +23,12 @@ video {
     height: 100%;
 }
 
-#progress-bar {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    height: 5px;
-    background-color: red;
-    width: 0%; /* 确保在未设置宽度前不显示 */
-}
-
 #volume-tip, #brightness-tip {
     position: absolute;
     color: white;
     background-color: rgba(0, 0, 0, 0.7);
     padding: 5px;
-    bottom: 50px; /* 提高提示信息的位置，避免被进度条覆盖 */
+    bottom: 50px;
 }
 
 #volume-tip {
@@ -53,20 +44,35 @@ video {
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
-    background-color: rgba(0, 0, 0, 0.7);
-    padding: 10px;
-    border-radius: 5px;
+    background-color: rgba(0, 0, 0, 0.8);
+    padding: 15px;
+    border-radius: 8px;
     color: white;
     display: none;
     text-align: center;
-    min-width: 120px;
+    min-width: 160px;
+    font-family: Arial, sans-serif;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.5s ease-out, visibility 0.5s ease-out;
+}
+
+#time-box.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+#time-text {
+    font-size: 16px;
+    display: inline-block;
+    vertical-align: middle;
 }
 
 #time-box-progress {
     width: 100%;
     height: 3px;
-    background-color: rgba(255, 255, 255, 0.3);
-    margin-top: 8px;
+    background-color: rgba(255, 255, 255, 0.2);
+    margin-top: 12px;
     border-radius: 1.5px;
     overflow: hidden;
 }
@@ -89,6 +95,38 @@ video::-webkit-media-controls-panel {
     display: none !important;
 }
 
+#top-progress-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0%;
+    height: 4px;
+    background-color: #eeeeee;
+    z-index: 10000;
+}
+
+/* 添加播放状态图标的样式 */
+#play-state {
+    display: inline-block;
+    margin-right: 8px;
+    font-size: 16px;
+    vertical-align: middle;
+}
+
+#play-pause-button {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    background-color: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
 </style>
 </head>
 <body>
@@ -98,17 +136,21 @@ video::-webkit-media-controls-panel {
         Your browser does not support the video tag.
     </video>
     <button id="play-button">Play Video</button>
-    <div id="progress-bar"></div>
     <div id="progress-tip" style="position: absolute; bottom: 20px; color: white; background-color: rgba(0, 0, 0, 0.7); padding: 5px;">00:00</div>
     <div id="volume-tip">Volume: 100%</div>
     <div id="brightness-tip">Brightness: 100%</div>
     <div id="time-box">
-        <span id="time-text">00:00 / 00:00</span>
+        <div style="margin-bottom: 12px;">
+            <span id="play-state">⏸️</span>
+            <span id="time-text">00:00 / 00:00</span>
+        </div>
         <div id="time-box-progress">
             <div id="time-box-progress-bar"></div>
         </div>
     </div>
 </div>
+<div id="top-progress-bar"></div>
+<button id="play-pause-button">▶️</button>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // 解析URL查询字符串
@@ -130,10 +172,20 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     const video = document.getElementById('video-player');
-    const progressBar = document.getElementById('progress-bar');
     const progressTip = document.getElementById('progress-tip');
     const volumeTip = document.getElementById('volume-tip');
     const brightnessTip = document.getElementById('brightness-tip');
+
+    const playPauseButton = document.getElementById('play-pause-button');
+    playPauseButton.addEventListener('click', function() {
+        if (video.paused || video.ended) {
+            video.play();
+            this.textContent = '⏸️'; // 暂停符号
+        } else {
+            video.pause();
+            this.textContent = '▶️';  // 播放符号
+        }
+    });
 
     // 初始化音量和亮度
     const defaultVolume = 0.1; // 10%
@@ -153,34 +205,98 @@ document.addEventListener('DOMContentLoaded', function() {
     let touchStartY = 0;
     let touchEndX = 0;
     let touchEndY = 0;
-    const threshold = 10; // 死区阈值，可根据需要调整
+    const threshold = 30; // 死区阈值，可根据需要调整
 
     const timeBox = document.getElementById('time-box');
     const timeText = document.getElementById('time-text');
     const timeBoxProgressBar = document.getElementById('time-box-progress-bar');
 
+    let controlsTimeout = null;
+    let isSwiping = false;  // 添加拖拽状态标记
+    let isAtDoubleSpeed = false; // 新增标记：是否已激活2倍速
+    let longPressTimer = null;  // 添加长按计时器
+    let originalPlaybackRate = 1.0;  // 保存原始播放速度
+
+    // 添加以下代码来禁止视频的默认上下文菜单和长按行为
+    video.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+    });
+
     video.addEventListener('touchstart', function(event) {
+        event.preventDefault();  // 阻止默认行为
         touchStartX = touchEndX = event.changedTouches[0].screenX;
         touchStartY = touchEndY = event.changedTouches[0].screenY;
-        timeBox.style.display = 'block';
-        updateTimeDisplay();
-        volumeTip.style.display = 'block';
-        brightnessTip.style.display = 'block';
+        isSwiping = false;  // 重置拖拽状态
+
+        // 设置长按计时器
+        longPressTimer = setTimeout(() => {
+            originalPlaybackRate = video.playbackRate;
+            video.playbackRate = 2.0;  // 设置2倍速
+            // 可以添加一个视觉提示
+            timeText.textContent += " (2x)";
+            // 置标记为 true
+            isAtDoubleSpeed = true;
+            // 在界面上添加一个 "(2x)" 提示
+            timeText.textContent += " (2x)";
+        }, 2000);  // 2秒长按触发
+        
+        // 清除之前的超时
+        if (controlsTimeout) {
+            clearTimeout(controlsTimeout);
+        }
+        
+        // 延迟显示控制器
+        controlsTimeout = setTimeout(() => {
+            timeBox.style.display = 'block';
+            requestAnimationFrame(() => {
+                timeBox.classList.add('visible');
+            });
+            updateTimeDisplay();
+            updatePlayState();
+            volumeTip.style.display = 'block';
+            brightnessTip.style.display = 'block';
+        }, 0);    // 立即显示，没有延迟
     }, false);
 
+    // 修改 touchmove 事件处理
+    const topProgressBar = document.getElementById('top-progress-bar');
     video.addEventListener('touchmove', function(event) {
-        event.preventDefault(); // Prevent scrolling
+        if (controlsTimeout) {
+            clearTimeout(controlsTimeout);
+            controlsTimeout = null;
+        }
+        
+        // 清除长按计时器
+        if (longPressTimer) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+        }
+
         const currentX = event.changedTouches[0].screenX;
         const currentY = event.changedTouches[0].screenY;
         const deltaX = currentX - touchEndX;
         const deltaY = currentY - touchEndY;
+        
+        // 如果移动距离超过阈值，标记为拖拽状态
+        if (Math.abs(deltaX) > threshold || Math.abs(deltaY) > threshold) {
+            isSwiping = true;
+            if (!video.paused) {  // 如果视频在播放，确保继续播放
+                video.play();
+            }
+        }
+
+        event.preventDefault(); // Prevent scrolling
         touchEndX = currentX;
         touchEndY = currentY;
+
+        // 添加灵敏度系数
+        const sensitivityFactor = 3.0; // 增加这个值会让控制更敏感
 
         if (Math.abs(deltaX) > Math.abs(deltaY)) {
             if (Math.abs(deltaY) < threshold) {
                 // Horizontal swipe: scrubbing
                 const newTime = video.currentTime + (deltaX / video.clientWidth) * video.duration;
+                topProgressBar.style.width = `${(newTime / video.duration) * 100}%`;
                 video.currentTime = Math.max(0, Math.min(video.duration, newTime));
                 updateTimeDisplay();
             }
@@ -189,27 +305,52 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Vertical swipe: volume and brightness
                 if (touchStartX > video.clientWidth / 2) {
                     // Right half for volume
-                    const volumeChange = deltaY / video.clientHeight;
-                    video.volume = Math.max(0, Math.min(1, video.volume - volumeChange));
-                    volumeTip.innerHTML = `Volume: ${Math.round(video.volume * 100)}%`;
-                    localStorage.setItem('volume', newVolume); // 保存到 localStorage
+                    const volumeChange = (deltaY / video.clientHeight) * sensitivityFactor;
+                    const newVolume = Math.max(0, Math.min(1, video.volume - volumeChange));
+                    video.volume = newVolume;
+                    volumeTip.innerHTML = `Volume: ${Math.round(newVolume * 100)}%`;
+                    localStorage.setItem('volume', newVolume);
                 } else {
-                    // Left half for simulated brightness
-                    const brightnessChange = -deltaY / video.clientHeight;
+                    // Left half for brightness
+                    const brightnessChange = (-deltaY / video.clientHeight) * sensitivityFactor;
                     const newBrightness = Math.max(0, Math.min(1, parseFloat(brightnessTip.getAttribute('data-brightness') || 1) + brightnessChange));
                     brightnessTip.setAttribute('data-brightness', newBrightness);
                     brightnessTip.innerHTML = `Brightness: ${Math.round(newBrightness * 100)}%`;
                     video.style.filter = `brightness(${newBrightness})`;
-                    localStorage.setItem('brightness', newBrightness); // 保存到 localStorage
+                    localStorage.setItem('brightness', newBrightness);
                 }
             }
         }
     }, false);
 
+    // 修改 touchend 事件处理
     video.addEventListener('touchend', function(event) {
-        timeBox.style.display = 'none';
-        volumeTip.style.display = 'none';
-        brightnessTip.style.display = 'none';
+        // 清除长按计时器
+        if (longPressTimer) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+        }
+
+        // 如果是2倍速状态，恢复正常速度
+        if (isAtDoubleSpeed) {
+            video.playbackRate = originalPlaybackRate;
+            // 去掉 "(2x)" 文案
+            timeText.textContent = timeText.textContent.replace(" (2x)", "");
+            // 更新一次显示
+            updateTimeDisplay();  // 更新显示
+            // 重置标记
+            isAtDoubleSpeed = false;
+        }
+
+        if (controlsTimeout) {
+            clearTimeout(controlsTimeout);
+        }
+        
+        timeBox.classList.remove('visible');
+        // 等待过渡效果完成后再隐藏元素
+        setTimeout(() => {
+            timeBox.style.display = 'none';
+        }, 1000);  // 与 CSS 过渡时间匹配
     }, false);
 
     function formatTime(seconds) {
@@ -225,15 +366,46 @@ document.addEventListener('DOMContentLoaded', function() {
         timeBoxProgressBar.style.width = `${progress}%`;
     }
 
-    progressBar.style.display = 'none';
     progressTip.style.display = 'none';
 
+    // 修改点击事件处理
     video.addEventListener('click', function() {
-        if (video.paused) {
-            video.play();
-        } else {
-            video.pause();
+        // 只有在非拖拽状态下才触发暂停/播放
+        if (!isSwiping) {
+            if (video.paused) {
+                video.play();
+            } else {
+                video.pause();
+            }
+            updatePlayState();
         }
+    });
+
+    // 添加播放状态更新函数
+    function updatePlayState() {
+        const playStateIcon = document.getElementById('play-state');
+        playStateIcon.textContent = video.paused ? '▶️' : '⏸️';
+    }
+
+    // 监听播放状态变化
+    video.addEventListener('play', function() {
+        updatePlayState();
+    });
+
+    video.addEventListener('pause', function() {
+        updatePlayState();
+    });
+
+    // 在正常播放时也更新顶部进度条
+    video.addEventListener('timeupdate', function() {
+        const progress = (video.currentTime / video.duration) * 100;
+        topProgressBar.style.width = `${progress}%`;
+    });
+
+    // 可选：为整个容器也添加阻止默认行为
+    const videoContainer = document.getElementById('video-container');
+    videoContainer.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
     });
 });
 </script>

@@ -57,6 +57,7 @@ var urlPrefix = "https://sukebei.nyaa.si/user/offkab?f=0&c=0_0&q="
 
 // name=FC2-PPV-123456
 func (s *SearchClient) Search(name string) (*SearchResult, error) {
+	log.Println("------ perform search", name)
 	for strings.Contains(name, "--") {
 		name = strings.ReplaceAll(name, "--", "-")
 	}

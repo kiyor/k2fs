@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/base64"
 	"encoding/gob"
@@ -17,8 +18,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -259,7 +260,7 @@ func isImage(path string) bool {
 func apiList(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	// log.Println(r.Method, r.URL.Path)
-	args := make(map[string]string)
+	args := make(map[string]interface{})
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Println(err)
@@ -273,9 +274,15 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 		NewErrResp(w, 1, err)
 		return
 	}
-	filter := args["search"]
+	filter := ""
+	if args["search"] != nil {
+		filter = args["search"].(string)
+	}
 	// 	path := "." + q.Get("path")
-	path := args["path"]
+	path := ""
+	if args["path"] != nil {
+		path = args["path"].(string)
+	}
 	if strings.Contains(path, "%") {
 		path, _ = url.PathUnescape(path)
 	}
@@ -293,7 +300,7 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var isRead, isFind, isSearch bool
-	switch args["listdir"] {
+	switch args["listdir"].(string) {
 	case "read":
 		isRead = true
 	case "find":
@@ -304,8 +311,17 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 		isRead = false
 		isSearch = true
 	}
-	openWith := args["openWith"]
-	log.Println("openWith", openWith)
+	openWith := args["openWith"].(string)
+	localStore := true
+	if args["localStore"] != nil {
+		switch val := args["localStore"].(type) {
+		case bool:
+			localStore = val
+		case string:
+			localStore, _ = strconv.ParseBool(val)
+		}
+	}
+	//log.Println("openWith", openWith)
 	session, err := store.Get(r, APP)
 	if err != nil {
 		log.Println(err)
@@ -420,6 +436,12 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 					nf.ShortCut = "nplayer-" + host + replacer.Replace(fp) //nplayer
 				case "vlc":
 					nf.ShortCut = "vlc://" + host + replacer.Replace(fp) //vlc
+				case "potplayer":
+					nf.ShortCut = "potplayer://" + host + replacer.Replace(fp) //potplayer
+				case "mxplayer":
+					nf.ShortCut = "intent:" + host + replacer.Replace(fp) //mxplayer
+				case "native":
+					nf.ShortCut = host + replacer.Replace(fp)
 				case "browser":
 					nf.ShortCut = "/player?" + q
 				default:
@@ -431,8 +453,8 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 			dir.Files = append(dir.Files, nf)
 		}
 		desc := true
-		if args["desc"] != "" {
-			session.Values["desc"] = []string{args["desc"]}
+		if args["desc"] != nil && args["desc"].(string) != "" {
+			session.Values["desc"] = []string{args["desc"].(string)}
 		}
 		if des, ok := session.Values["desc"]; ok {
 			d := des.([]string)
@@ -445,8 +467,8 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 				log.Println(d)
 			}
 		}
-		if args["sortby"] != "" {
-			session.Values["sortby"] = []string{args["sortby"]}
+		if args["sortby"] != nil && args["sortby"].(string) != "" {
+			session.Values["sortby"] = []string{args["sortby"].(string)}
 		}
 		if sortby, ok := session.Values["sortby"]; ok {
 			s := sortby.([]string)
@@ -491,13 +513,12 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 		client.RetryWaitMax = 10 * time.Second
 
 		var tasks []golib.Task
-		var cdn bool
-
-		cdn = true
+		var cdn bool = true
 
 		for _, _v := range dir.Files {
 			v := _v
 			fc := func() error {
+				t1 := time.Now()
 				name := strings.TrimRight(v.Name, "/")
 				pathID := filepath.Join(strings.Trim(path, "/"), name)
 				name = filepath.Base(name)
@@ -520,6 +541,9 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 						}
 						v.Description += jr.Data.Title
 						v.ThumbLink = jr.Data.BackupCover
+						if localStore {
+							v.ThumbLink = strings.Replace(v.ThumbLink, "https://s3.us-west-1.wasabisys.com/", "https://wasabi.local/", 1)
+						}
 						// tags
 						m := make(map[string]bool)
 						m[name2series(name)] = true
@@ -586,6 +610,9 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 						}
 						v.Description += jr.Data.Title
 						v.ThumbLink = jr.Data.BackupCover
+						if localStore {
+							v.ThumbLink = strings.Replace(v.ThumbLink, "https://s3.us-west-1.wasabisys.com/", "http://wasabi.local/", 1)
+						}
 						// tags
 						m := make(map[string]bool)
 						m[name2series(name)] = true
@@ -624,6 +651,7 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 						}
 					}
 				}
+				t2 := time.Now()
 				if _, b := isSearchable(name); !found && b {
 					key := "title:" + pathID
 					if val, err := lib.Cache.Get(key); err == nil {
@@ -632,11 +660,20 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 						fetchTitle(pathID)
 					}
 				}
+				dur := time.Since(t1)
+				if dur > time.Second {
+					log.Println("fetch data", pathID, dur.String(), time.Since(t2))
+				}
 				return nil
 			}
-			tasks = append(tasks, golib.NewTask(fc, nil, false))
+			tasks = append(tasks, golib.NewTask(func() error {
+				return runWithTimeout(fc, 500*time.Millisecond)
+			}, nil, false))
 		}
-		golib.NewManager(runtime.NumCPU()*10, 10000).Do(tasks)
+		log.Println("len", len(tasks))
+		t1 := time.Now()
+		golib.NewManager(20, len(tasks)).Do(tasks)
+		dur := time.Since(t1)
 		if isSearch {
 			match := func(name string) bool {
 				if strings.HasPrefix(filter, "!") {
@@ -666,7 +703,7 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 			dir.Files = files
 		}
 		// query thumb end
-		NewResp(w, dir)
+		NewResp(w, dir, []time.Duration{dur})
 	}
 }
 
@@ -856,4 +893,21 @@ func base64Encode(s string) string {
 func md5Encode(s string) string {
 	v := fmt.Sprintf("%x", md5.Sum([]byte(s)))
 	return v
+}
+
+func runWithTimeout(fc func() error, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		done <- fc()
+	}()
+
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("function timed out after %v", timeout)
+	case err := <-done:
+		return err
+	}
 }

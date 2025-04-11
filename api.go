@@ -21,7 +21,7 @@ type Resp struct {
 	Data interface{}
 }
 
-func NewResp(w http.ResponseWriter, data interface{}, code ...int) []byte {
+func NewResp(w http.ResponseWriter, data interface{}, durs []time.Duration, code ...int) []byte {
 	c := 0
 	if len(code) > 0 {
 		c = code[0]
@@ -39,6 +39,10 @@ func NewResp(w http.ResponseWriter, data interface{}, code ...int) []byte {
 	w.Header().Add("Access-Control-Allow-Origin", "*")
 	w.Header().Add("Access-Control-Allow-Methods", "GET,PUT,POST,PATCH,OPTIONS")
 	w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
+	for k, dur := range durs {
+		w.Header().Add(fmt.Sprintf("X-Profile-%d", k), dur.String())
+		log.Println("profile", k, dur.String())
+	}
 	w.Write(b)
 	return b
 }
@@ -64,7 +68,7 @@ func NewCacheResp(w http.ResponseWriter, data interface{}, cacheKey string, expi
 }
 
 func NewErrResp(w http.ResponseWriter, code int, err error) []byte {
-	return NewResp(w, err.Error(), code)
+	return NewResp(w, err.Error(), nil, code)
 }
 
 type Dir struct {

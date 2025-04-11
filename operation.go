@@ -188,8 +188,8 @@ func apiOperation(w http.ResponseWriter, r *http.Request) {
 	err = meta.Write()
 	if err != nil {
 		log.Println(err)
-		NewResp(w, err, 1)
+		NewResp(w, err, nil, 1)
 		return
 	}
-	NewResp(w, "success")
+	NewResp(w, "success", nil)
 }

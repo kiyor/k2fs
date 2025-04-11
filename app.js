@@ -124,6 +124,7 @@ const myapp = {
             hoveredFile: "",
             history: [],
             openWith: localStorage.getItem('openWith') || 'browser', // Default to 'browser'
+            localStore: localStorage.getItem('localStore') || true, // Default to 'browser'
         }
     },
     async mounted() {
@@ -183,6 +184,11 @@ const myapp = {
             console.log(value);
             localStorage.setItem('openWith', value);
             this.listApi(); // Refresh the file list with the new openWith option
+        },
+        changeLocalStore(value) {
+            console.log(value);
+            localStorage.setItem('localStore', value);
+            this.listApi();
         },
         onClick(path, file) {
             if (!file.IsDir) {
@@ -584,6 +590,7 @@ const myapp = {
             data.list = "read";
             data.search = this.search;
             data.openWith = this.openWith;
+            data.localStore = this.localStore;
             await axios.post("/api?action=list", data)
                 .then(response => {
                     this.resp = response.data.Data;
@@ -620,6 +627,7 @@ const myapp = {
             data.path = path;
             data.listdir = "find";
             data.openWith = this.openWith;
+            data.localStore = this.localStore;
             await axios.post("/api?action=list", data)
                 .then(response => {
                     var resp = response.data.Data;

@@ -13,6 +13,8 @@ import (
 	"text/template"
 	"time"
 
+	_ "net/http/pprof"
+
 	"github.com/NYTimes/gziphandler"
 	"github.com/gorilla/mux"
 	"github.com/kiyor/k2fs/lib"
@@ -53,7 +55,7 @@ func init() {
 	flag.StringVar(&dbDir, "db", ".", "db dir")
 	flag.StringVar(&flagHost, "host", "", "host if need overwrite; syntax like http://a.com(:8080)")
 	flag.StringVar(&flagStaticFileHost, "static", "", "static file host like http://a.com(:8080)")
-	flag.StringVar(&metaHost, "meta", "10.43.62.113", "meta host")
+	flag.StringVar(&metaHost, "meta", "10.43.1.10", "meta host")
 	flag.Var(&flagDf, "df", "monitor mount dir")
 }
 

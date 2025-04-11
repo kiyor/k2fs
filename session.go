@@ -31,5 +31,5 @@ func apiSession(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	NewResp(w, "ok")
+	NewResp(w, "ok", nil)
 }

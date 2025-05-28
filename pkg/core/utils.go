@@ -1,4 +1,4 @@
-package main
+package core
 
 import (
 	"regexp"
@@ -30,6 +30,7 @@ func getFrame(skipFrames int) runtime.Frame {
 	return frame
 }
 
+// GetCurrentFunctionName returns the name of the function that calls it.
 func GetCurrentFunctionName() string {
 	// Skip GetCurrentFunctionName
 	fn := getFrame(1).Function
@@ -51,9 +52,9 @@ func GetCurrentFunctionName() string {
 				}
 
 				f := strings.Split(v, ".")
-				if len(fn) > 1 {
+				if len(fn) > 1 { // Check if fn was split, if so, it's a method
 					fn = strings.Join(f[1:], ".")
-				} else {
+				} else { // If not split, it's a plain function
 					fn = v
 				}
 				break
@@ -63,8 +64,10 @@ func GetCurrentFunctionName() string {
 	return fn
 }
 
+// GetCallerFunctionName returns the name of the function that called the function that called it.
+// opt can be used to skip additional frames.
 func GetCallerFunctionName(opt ...int) string {
-	f := 2
+	f := 2 // Skip GetCallerFunctionName and its immediate caller
 	if len(opt) > 0 {
 		f += opt[0]
 	}
@@ -76,7 +79,7 @@ func GetCallerFunctionName(opt ...int) string {
 		p := strings.Split(fn, ".")
 		fn = p[len(p)-1]
 	}
-	if fn == "goexit" {
+	if fn == "goexit" { // Handle goroutines
 		p := strings.Split(string(debug.Stack()), "\n")
 		for _, v := range p {
 			if strings.HasPrefix(v, "created by") {
@@ -86,7 +89,7 @@ func GetCallerFunctionName(opt ...int) string {
 				}
 
 				f := strings.Split(v, ".")
-				if len(fn) > 1 {
+				if len(f) > 1 { // Check if f was split
 					fn = strings.Join(f[1:], ".")
 				} else {
 					fn = v

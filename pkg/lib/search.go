@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kiyor/k2fs/pkg/xnode"
+	"github.com/kiyor/k2fs/pkg/xnode_client" // Corrected import path
 	"golang.org/x/net/proxy"
 )
 
@@ -106,9 +106,9 @@ func (s *SearchClient) Search(name string) (*SearchResult, error) {
 					return nil, err
 				}
 				// 			log.Println(string(b))
-				node, _ := xnode.NewNode(b)
+				node, _ := xnode_client.NewNode(b) // Corrected package name
 				var title string
-				node.Find(`a`).Each(func(i int, n *xnode.Node) {
+				node.Find(`a`).Each(func(i int, n *xnode_client.Node) { // Corrected type
 					if n.Attr("title") != "" {
 						if strings.HasPrefix(n.Attr("href"), "/view/") {
 							title = n.Attr("title")

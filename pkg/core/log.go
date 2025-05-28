@@ -1,21 +1,25 @@
-package main
+package core
 
 import (
 	"context"
 	"fmt"
 	"io"
 	"log"
-	"net/http"
+	"net/http" // This will need to be adapted if used with Fiber
 	"os"
 	"time"
 
 	"github.com/kiyor/terminal/color"
 )
 
+// LogHandler is a custom HTTP log handler.
+// NOTE: This was designed for net/http. Fiber has its own logging middleware.
+// This may need refactoring or may be deprecated.
 type LogHandler struct {
 	l *log.Logger
 }
 
+// NewLogHandler creates a new LogHandler.
 func NewLogHandler() *LogHandler {
 	return &LogHandler{
 		l: log.New(os.Stdout, color.Sprint("@{g}[http]@{|} "), log.LstdFlags),
@@ -46,10 +50,13 @@ func (w *statusWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
+// Set allows configuring the logger's output, prefix, and flags.
 func (l *LogHandler) Set(out io.Writer, prefix string, flag int) {
 	l.l = log.New(out, prefix, flag)
 }
 
+// Handler wraps an http.Handler to log requests.
+// NOTE: This is for net/http.
 func (l *LogHandler) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t1 := time.Now()

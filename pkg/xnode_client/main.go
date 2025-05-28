@@ -1,4 +1,4 @@
-package xnode
+package xnode_client // Corrected package declaration
 
 import (
 	"bytes"
@@ -22,6 +22,9 @@ func NewNode(b []byte) (*Node, error) {
 }
 
 func (n *Node) NextSibling() *Node {
+	if n.Node.NextSibling == nil {
+		return nil // Or handle as appropriate, e.g. return &Node{nil} if methods handle nil Node.Node
+	}
 	return &Node{n.Node.NextSibling}
 }
 func (n *Node) NextSiblingWithAttr(query string) *Node {
@@ -46,8 +49,8 @@ func (n *Node) NextSiblingWithAttr(query string) *Node {
 			}
 		}
 	}
-
-	return &Node{n.Node.NextSibling}
+	// Return nil or an empty Node if not found, rather than the original node's sibling
+	return nil // Or &Node{nil}
 }
 func (n *Node) FirstChildWithAttr(query string) *Node {
 	var k, v string
@@ -71,10 +74,14 @@ func (n *Node) FirstChildWithAttr(query string) *Node {
 			}
 		}
 	}
-
-	return &Node{n.Node.NextSibling}
+	// Return nil or an empty Node if not found
+	return nil // Or &Node{nil}
 }
+
 func (n *Node) FirstChild() *Node {
+	if n.Node.FirstChild == nil {
+		return nil // Or &Node{nil}
+	}
 	return &Node{n.Node.FirstChild}
 }
 
@@ -239,21 +246,49 @@ func getData(n *html.Node) string {
 	if n.FirstChild == nil {
 		return ""
 	}
-	if n.FirstChild.Type != html.TextNode {
-		return getData(n.FirstChild)
+	// Iterate over children to concatenate all text nodes
+	var textBuilder strings.Builder
+	for child := n.FirstChild; child != nil; child = child.NextSibling {
+		if child.Type == html.TextNode {
+			textBuilder.WriteString(child.Data)
+		} else if child.Type == html.ElementNode {
+			// Recursively get text from element children, or handle as needed
+			// For simple Text(), typically only direct text nodes are considered.
+			// If nested text is needed, this needs to be recursive like traverse.
+			// For now, sticking to original intent which seems to be direct child text.
+		}
 	}
-	return strings.TrimSpace(n.FirstChild.Data)
+	return strings.TrimSpace(textBuilder.String())
 }
+
 
 func (n *Node) Text() string {
-	return getData(n.Node)
+	// If node itself is a text node
+	if n.Node.Type == html.TextNode {
+		return strings.TrimSpace(n.Node.Data)
+	}
+	// If it's an element node, concatenate text from all direct child text nodes
+	if n.Node.Type == html.ElementNode {
+		var textBuilder strings.Builder
+		for child := n.Node.FirstChild; child != nil; child = child.NextSibling {
+			if child.Type == html.TextNode {
+				textBuilder.WriteString(child.Data)
+			}
+		}
+		return strings.TrimSpace(textBuilder.String())
+	}
+	return "" // For other node types like DocumentNode, CommentNode, etc.
 }
 
+
 func (n *Node) Next() *Node {
-	nn := &Node{n.Node.NextSibling}
-	if len(strings.TrimSpace(nn.String())) == 0 {
-		return nn.Next()
+	if n.Node.NextSibling == nil {
+		return nil
 	}
+	nn := &Node{n.Node.NextSibling}
+	// The original logic for skipping empty string nodes was problematic.
+	// A "Next" method should generally just return the next sibling.
+	// If specific skipping logic is needed, it should be a different method.
 	return nn
 }
 

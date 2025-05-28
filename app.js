@@ -123,6 +123,8 @@ const myapp = {
             isShowing: "",
             hoveredFile: "",
             history: [],
+            limit: 200,
+            page: 1,
             openWith: localStorage.getItem('openWith') || 'browser', // Default to 'browser'
             localStore: localStorage.getItem('localStore') || true, // Default to 'browser'
         }
@@ -324,6 +326,15 @@ const myapp = {
                 } else {
                     this.files[i].Meta.Label = this.labelMap[this.files[i].Name];
                 }
+            }
+            if (this.openWith === 'browser') {
+                document.querySelectorAll('a.sublink').forEach(a => {
+                    a.setAttribute('target', 'player');
+                });
+            } else {
+                document.querySelectorAll('a.sublink[target="player"]').forEach(a => {
+                    a.removeAttribute('target');
+                });
             }
             console.log("colorCleaner finished")
         },
@@ -591,6 +602,8 @@ const myapp = {
             data.search = this.search;
             data.openWith = this.openWith;
             data.localStore = this.localStore;
+            data.limit = this.limit;
+            data.page = this.page;
             await axios.post("/api?action=list", data)
                 .then(response => {
                     this.resp = response.data.Data;

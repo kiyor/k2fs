@@ -168,7 +168,7 @@ func apiOperation(w http.ResponseWriter, r *http.Request) {
 				} else { // not inside trash
 					dst := filepath.Join(Trash, k)
 					log.Println("mv", file, dst)
-					os.Rename(file, dst)
+					go os.Rename(file, dst)
 					meta.Del(k)
 					m.OldLoc = file
 					trashMeta.Set(k, m)

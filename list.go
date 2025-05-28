@@ -52,6 +52,7 @@ var hideContain = []string{
 }
 var hideRe = []*regexp.Regexp{
 	regexp.MustCompile(`^\.nfs[\w]{24}`),
+	regexp.MustCompile(`996gg\.cc`),
 }
 var videoExt = map[string]string{
 	".mp4": "video/mp4",
@@ -274,6 +275,7 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 		NewErrResp(w, 1, err)
 		return
 	}
+	// log.Println(args)
 	filter := ""
 	if args["search"] != nil {
 		filter = args["search"].(string)
@@ -319,6 +321,32 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 			localStore = val
 		case string:
 			localStore, _ = strconv.ParseBool(val)
+		}
+	}
+	var limit int
+	if args["limit"] != nil {
+		switch val := args["limit"].(type) {
+		case int:
+			limit = val
+		case string:
+			limit, _ = strconv.Atoi(val)
+		case float64:
+			limit = int(val)
+		default:
+			log.Printf("limit %T %v", val, val)
+		}
+	}
+	var page int
+	if args["page"] != nil {
+		switch val := args["page"].(type) {
+		case int:
+			page = val
+		case string:
+			page, _ = strconv.Atoi(val)
+		case float64:
+			page = int(val)
+		default:
+			log.Printf("page %T %v", val, val)
 		}
 	}
 	//log.Println("openWith", openWith)
@@ -408,27 +436,6 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 					qv["type"] = []string{t}
 				}
 				q := replacer.Replace(qv.Encode())
-				/*
-					switch {
-					case isMac(r):
-						nf.ShortCut = "iina://open?" + q
-					case isIos(r):
-						// nf.ShortCut = host + replacer.Replace(fp)
-						// nf.ShortCut = "vlc://" + host + fp //vlc
-						nf.ShortCut = "nplayer-" + host + replacer.Replace(fp) //nplayer
-						// nf.ShortCut = "infuse://x-callback-url/play?" + q      //infuse
-
-					case isWin(r):
-						nf.ShortCut = host + replacer.Replace(fp)
-					case isSoul(r):
-						nf.ShortCut = host + replacer.Replace(fp)
-					default:
-						// nf.ShortCut = "http://192.168.10.31/player?" + q
-						// nf.ShortCut = "/player?" + q
-						nf.ShortCut = "nplayer-" + host + replacer.Replace(fp) //nplayer
-						//nf.ShortCut = host + replacer.Replace(fp)
-					}
-				*/
 				switch openWith {
 				case "iina":
 					nf.ShortCut = "iina://open?" + q
@@ -507,6 +514,26 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 				return b
 			})
 		}
+		// page logic start
+		log.Println("page", page, "limit", limit)
+		if len(filter) == 0 {
+			if limit > 0 {
+				if page > 0 {
+					end := page * limit
+					if end > len(dir.Files) {
+						end = len(dir.Files)
+					}
+					dir.Files = dir.Files[(page-1)*limit : end]
+				} else {
+					end := limit
+					if end > len(dir.Files) {
+						end = len(dir.Files)
+					}
+					dir.Files = dir.Files[:end]
+				}
+			}
+		}
+
 		client := retryablehttp.NewClient()
 		client.HTTPClient.Timeout = 2 * time.Second
 		client.RetryMax = 2
@@ -703,6 +730,23 @@ func apiList(w http.ResponseWriter, r *http.Request) {
 			dir.Files = files
 		}
 		// query thumb end
+		if len(filter) != 0 {
+			if limit > 0 {
+				if page > 0 {
+					end := page * limit
+					if end > len(dir.Files) {
+						end = len(dir.Files)
+					}
+					dir.Files = dir.Files[(page-1)*limit : end]
+				} else {
+					end := limit
+					if end > len(dir.Files) {
+						end = len(dir.Files)
+					}
+					dir.Files = dir.Files[:end]
+				}
+			}
+		}
 		NewResp(w, dir, []time.Duration{dur})
 	}
 }
